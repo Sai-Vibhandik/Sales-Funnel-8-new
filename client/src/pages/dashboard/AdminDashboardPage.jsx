@@ -24,8 +24,33 @@ import {
   Eye,
   CheckSquare,
   AlertCircle,
+  Shield,
+  FileText,
+  Image,
+  Video,
+  Layout,
+  Code,
+  Crown,
+  PieChart as PieChartIcon,
+  BarChart3,
+  LayoutGrid,
+  List,
+  Calendar,
 } from 'lucide-react';
 import { cn, formatDate } from '@/lib/utils';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
 
 // Modal Portal Component - renders modals at document.body to avoid z-index issues
 function ModalPortal({ children }) {
@@ -35,11 +60,58 @@ function ModalPortal({ children }) {
   );
 }
 
-// Stat Card Component
+// Role icon mapping
+const ROLE_ICONS = {
+  admin: { icon: Crown, color: 'bg-red-100 text-red-600', gradient: 'from-red-400 to-red-600' },
+  performance_marketer: { icon: TrendingUp, color: 'bg-blue-100 text-blue-600', gradient: 'from-blue-400 to-blue-600' },
+  content_writer: { icon: FileText, color: 'bg-emerald-100 text-emerald-600', gradient: 'from-emerald-400 to-emerald-600' },
+  graphic_designer: { icon: Image, color: 'bg-pink-100 text-pink-600', gradient: 'from-pink-400 to-pink-600' },
+  video_editor: { icon: Video, color: 'bg-cyan-100 text-cyan-600', gradient: 'from-cyan-400 to-cyan-600' },
+  ui_ux_designer: { icon: Layout, color: 'bg-purple-100 text-purple-600', gradient: 'from-purple-400 to-purple-600' },
+  developer: { icon: Code, color: 'bg-green-100 text-green-600', gradient: 'from-green-400 to-green-600' },
+  tester: { icon: CheckCircle, color: 'bg-orange-100 text-orange-600', gradient: 'from-orange-400 to-orange-600' },
+};
+
+// Role Icon Component
+function RoleIcon({ role, size = 'md', showLabel = false }) {
+  const config = ROLE_ICONS[role] || ROLE_ICONS.admin;
+  const Icon = config.icon;
+
+  const sizes = {
+    sm: 'w-8 h-8',
+    md: 'w-10 h-10',
+    lg: 'w-12 h-12',
+  };
+
+  const iconSizes = {
+    sm: 16,
+    md: 20,
+    lg: 24,
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className={cn(
+        sizes[size],
+        'rounded-xl flex items-center justify-center',
+        config.color
+      )}>
+        <Icon size={iconSizes[size]} />
+      </div>
+      {showLabel && (
+        <span className="text-sm font-medium text-gray-700">
+          {role?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// Stat Card Component with Enhanced UI
 function StatCard({ title, value, change, changeType, icon: Icon, iconBg }) {
   const isPositive = changeType === 'positive';
   return (
-    <div className="stat-card">
+    <div className="stat-card-enhanced">
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <p className="text-sm text-gray-500 font-medium">{title}</p>
@@ -66,13 +138,15 @@ function StatCard({ title, value, change, changeType, icon: Icon, iconBg }) {
   );
 }
 
-// Team Member Card
+// Team Member Card with Role Icons
 function TeamMemberCard({ member, onClick }) {
   const roleColors = {
     admin: 'bg-red-100 text-red-700',
     performance_marketer: 'bg-blue-100 text-blue-700',
+    content_writer: 'bg-emerald-100 text-emerald-700',
     ui_ux_designer: 'bg-purple-100 text-purple-700',
     graphic_designer: 'bg-pink-100 text-pink-700',
+    video_editor: 'bg-cyan-100 text-cyan-700',
     developer: 'bg-green-100 text-green-700',
     tester: 'bg-orange-100 text-orange-700',
   };
@@ -80,8 +154,10 @@ function TeamMemberCard({ member, onClick }) {
   const roleLabels = {
     admin: 'Admin',
     performance_marketer: 'Performance Marketer',
+    content_writer: 'Content Writer',
     ui_ux_designer: 'UI/UX Designer',
     graphic_designer: 'Graphic Designer',
+    video_editor: 'Video Editor',
     developer: 'Developer',
     tester: 'Tester',
   };
@@ -92,10 +168,13 @@ function TeamMemberCard({ member, onClick }) {
     offline: 'bg-gray-400',
   };
 
+  const roleConfig = ROLE_ICONS[member.role] || ROLE_ICONS.admin;
+  const Icon = roleConfig.icon;
+
   return (
     <div
       onClick={onClick}
-      className="p-4 bg-white rounded-xl border border-gray-100 hover:border-primary-200 hover:shadow-md cursor-pointer transition-all duration-200"
+      className="team-member-card-enhanced"
     >
       <div className="flex items-center gap-3">
         <div className="relative">
@@ -111,9 +190,14 @@ function TeamMemberCard({ member, onClick }) {
           <h4 className="font-semibold text-gray-900 truncate">{member.name}</h4>
           <p className="text-sm text-gray-500 truncate">{member.email}</p>
         </div>
-        <Badge className={cn('text-xs', roleColors[member.role])}>
-          {roleLabels[member.role]}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <div className={cn('p-1.5 rounded-lg', roleConfig.color)}>
+            <Icon size={14} />
+          </div>
+          <Badge className={cn('text-xs', roleColors[member.role])}>
+            {roleLabels[member.role]}
+          </Badge>
+        </div>
       </div>
       {member.specialization && (
         <p className="mt-2 text-xs text-gray-400">{member.specialization}</p>
@@ -122,7 +206,7 @@ function TeamMemberCard({ member, onClick }) {
   );
 }
 
-// Project Card Component
+// Project Card Component with Enhanced UI
 function ProjectCard({ project, onClick }) {
   const statusColors = {
     active: 'bg-green-100 text-green-700',
@@ -134,7 +218,7 @@ function ProjectCard({ project, onClick }) {
   return (
     <div
       onClick={onClick}
-      className="p-4 bg-white rounded-xl border border-gray-100 hover:border-primary-200 hover:shadow-md cursor-pointer transition-all duration-200"
+      className="project-card-enhanced"
     >
       <div className="flex items-start justify-between mb-3">
         <div>
@@ -174,6 +258,74 @@ function ProjectCard({ project, onClick }) {
           <span className="text-xs text-gray-400">Industry: {project.industry}</span>
         </div>
       )}
+    </div>
+  );
+}
+
+// Project Row Component for List View
+function ProjectRow({ project, onClick }) {
+  const statusColors = {
+    active: 'bg-green-100 text-green-700',
+    paused: 'bg-yellow-100 text-yellow-700',
+    completed: 'bg-blue-100 text-blue-700',
+    archived: 'bg-gray-100 text-gray-600',
+  };
+
+  const statusLabels = {
+    active: 'Active',
+    paused: 'Paused',
+    completed: 'Completed',
+    archived: 'Archived',
+  };
+
+  return (
+    <div
+      onClick={onClick}
+      className="flex items-center gap-4 p-4 bg-white rounded-xl border border-gray-100 hover:border-gray-200 hover:shadow-md transition-all duration-200 cursor-pointer"
+    >
+      {/* Project Info */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <h3 className="font-semibold text-gray-900 truncate">{project.projectName || project.businessName}</h3>
+          {project.isActive ? (
+            <span className="w-2 h-2 bg-emerald-500 rounded-full flex-shrink-0" />
+          ) : (
+            <span className="w-2 h-2 bg-gray-400 rounded-full flex-shrink-0" />
+          )}
+        </div>
+        <p className="text-sm text-gray-500 truncate">{project.customerName}</p>
+      </div>
+
+      {/* Industry */}
+      <div className="hidden md:block w-32">
+        <span className="text-sm text-gray-600">{project.industry || '-'}</span>
+      </div>
+
+      {/* Status */}
+      <div className="flex items-center gap-2">
+        <Badge className={cn('text-xs', statusColors[project.status])}>
+          {statusLabels[project.status] || project.status}
+        </Badge>
+      </div>
+
+      {/* Progress */}
+      <div className="hidden lg:flex items-center gap-3 w-40">
+        <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{
+              width: `${project.overallProgress}%`,
+              background: project.overallProgress >= 100
+                ? '#10B981'
+                : 'linear-gradient(90deg, #FFC107 0%, #FFD54F 100%)'
+            }}
+          />
+        </div>
+        <span className="text-sm font-medium text-gray-900 w-10 text-right">{project.overallProgress}%</span>
+      </div>
+
+      {/* Arrow */}
+      <ChevronRight size={18} className="text-gray-400 flex-shrink-0" />
     </div>
   );
 }
@@ -390,10 +542,25 @@ function StrategyDetailModal({ strategy, onClose, onReview }) {
   );
 }
 
+// Chart Colors
+const CHART_COLORS = {
+  primary: '#FFC107',
+  secondary: '#FFD54F',
+  success: '#10B981',
+  info: '#3B82F6',
+  purple: '#8B5CF6',
+  pink: '#EC4899',
+  cyan: '#06B6D4',
+  orange: '#F97316',
+  red: '#EF4444',
+  gray: '#6B7280',
+};
+
 export default function AdminDashboardPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [projectViewMode, setProjectViewMode] = useState('card'); // 'card' or 'list'
   const [stats, setStats] = useState({
     totalProjects: 0,
     activeProjects: 0,
@@ -480,6 +647,35 @@ export default function AdminDashboardPage() {
     fetchData();
   };
 
+  // Prepare pie chart data for tasks by status
+  const getTaskStatusData = () => {
+    return [
+      { name: 'Active Projects', value: stats.activeProjects, color: CHART_COLORS.success },
+      { name: 'Completed', value: stats.completedProjects, color: CHART_COLORS.info },
+      { name: 'Other', value: stats.totalProjects - stats.activeProjects - stats.completedProjects, color: CHART_COLORS.gray },
+    ].filter(item => item.value > 0);
+  };
+
+  // Prepare bar chart data for team by role
+  const getTeamByRoleData = () => {
+    const roleLabels = {
+      admin: 'Admin',
+      performance_marketer: 'Marketers',
+      content_writer: 'Writers',
+      ui_ux_designer: 'UI/UX',
+      graphic_designer: 'Designers',
+      video_editor: 'Video',
+      developer: 'Developers',
+      tester: 'Testers',
+    };
+
+    return Object.entries(teamStats.byRole).map(([role, count]) => ({
+      name: roleLabels[role] || role,
+      count,
+      color: ROLE_ICONS[role]?.gradient ? `url(#gradient-${role})` : CHART_COLORS.gray,
+    }));
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -487,6 +683,9 @@ export default function AdminDashboardPage() {
       </div>
     );
   }
+
+  const taskStatusData = getTaskStatusData();
+  const teamByRoleData = getTeamByRoleData();
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -501,21 +700,13 @@ export default function AdminDashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {/* Notifications Bell */}
-          <div className="relative">
-            {/* <button
-              onClick={() => setShowNotifications(!showNotifications)}
-              className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors"
-            >
-              <Bell size={20} className="text-gray-600" />
-              {strategyNotifications.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                  {strategyNotifications.length}
-                </span>
-              )}
-            </button> */}
+          {/* <div className="relative">
+            {strategyNotifications.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                {strategyNotifications.length}
+              </span>
+            )}
 
-            {/* Notifications Dropdown */}
             {showNotifications && (
               <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-200 z-50">
                 <div className="p-4 border-b border-gray-100">
@@ -554,7 +745,7 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
             )}
-          </div>
+          </div> */}
 
           <Button variant="outline" onClick={() => navigate('/team')}>
             <Users size={18} className="mr-2" />
@@ -624,44 +815,156 @@ export default function AdminDashboardPage() {
         />
       </div>
 
-      {/* Team Overview by Role */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        {Object.entries({
-          admin: { label: 'Admins', color: 'bg-red-500' },
-          performance_marketer: { label: 'Marketers', color: 'bg-blue-500' },
-          ui_ux_designer: { label: 'UI/UX', color: 'bg-purple-500' },
-          graphic_designer: { label: 'Designers', color: 'bg-pink-500' },
-          developer: { label: 'Developers', color: 'bg-green-500' },
-          tester: { label: 'Testers', color: 'bg-orange-500' },
-        }).map(([role, config]) => (
-          <div key={role} className="bg-white rounded-xl border border-gray-100 p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className={cn('w-3 h-3 rounded-full', config.color)} />
-              <span className="text-sm text-gray-600">{config.label}</span>
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Pie Chart - Project Status Distribution */}
+        <div className="lg:col-span-1 chart-container-enhanced">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary-400 to-primary-500">
+              <PieChartIcon size={20} className="text-white" />
             </div>
-            <p className="text-2xl font-bold text-gray-900">
-              {teamStats.byRole[role] || 0}
-            </p>
+            <div>
+              <h3 className="font-semibold text-gray-900">Projects Overview</h3>
+              <p className="text-sm text-gray-500">Status distribution</p>
+            </div>
           </div>
-        ))}
+          {taskStatusData.length > 0 ? (
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={taskStatusData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={70}
+                    paddingAngle={3}
+                    dataKey="value"
+                  >
+                    {taskStatusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'white',
+                      border: 'none',
+                      borderRadius: '12px',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                      padding: '12px'
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-56 flex items-center justify-center text-gray-400">
+              No project data
+            </div>
+          )}
+          {/* Legend */}
+          <div className="flex flex-wrap justify-center gap-4 mt-4 pt-4 border-t border-gray-100">
+            {taskStatusData.map((item, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                <span className="text-sm text-gray-600">{item.name}</span>
+                <span className="text-sm font-semibold text-gray-900">{item.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Bar Chart - Team by Role */}
+        <div className="lg:col-span-2 chart-container-enhanced">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-400 to-blue-500">
+                <BarChart3 size={20} className="text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Team Distribution</h3>
+                <p className="text-sm text-gray-500">Members per role</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-2xl font-bold text-gray-900">{teamStats.total}</p>
+              <p className="text-sm text-gray-500">Total Members</p>
+            </div>
+          </div>
+          {teamByRoleData.length > 0 ? (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={teamByRoleData} layout="vertical" barSize={24}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={true} vertical={false} />
+                  <XAxis type="number" tick={{ fill: '#6B7280', fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fill: '#6B7280', fontSize: 12 }} width={90} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'white',
+                      border: 'none',
+                      borderRadius: '12px',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                      padding: '12px'
+                    }}
+                    cursor={{ fill: 'rgba(255, 193, 7, 0.1)' }}
+                  />
+                  <Bar dataKey="count" fill="#FFC107" radius={[0, 6, 6, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-64 flex items-center justify-center text-gray-400">
+              No team data available
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Projects and Team Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Projects */}
         <div className="lg:col-span-2">
-          <div className="chart-container">
+          <div className="chart-container-enhanced">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">Recent Projects</h3>
                 <p className="text-sm text-gray-500 mt-1">Latest project activity</p>
               </div>
-              <Link
-                to="/projects"
-                className="text-sm text-primary-600 hover:text-primary-700 font-medium"
-              >
-                View All
-              </Link>
+              <div className="flex items-center gap-3">
+                {/* View Toggle */}
+                <div className="flex items-center bg-gray-100 rounded-lg p-1">
+                  <button
+                    onClick={() => setProjectViewMode('card')}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
+                      projectViewMode === 'card'
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-500 hover:text-gray-700"
+                    )}
+                  >
+                    <LayoutGrid size={16} />
+                    <span className="hidden sm:inline">Cards</span>
+                  </button>
+                  <button
+                    onClick={() => setProjectViewMode('list')}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
+                      projectViewMode === 'list'
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-500 hover:text-gray-700"
+                    )}
+                  >
+                    <List size={16} />
+                    <span className="hidden sm:inline">List</span>
+                  </button>
+                </div>
+                <Link
+                  to="/projects"
+                  className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                >
+                  View All
+                </Link>
+              </div>
             </div>
 
             {stats.recentProjects.length === 0 ? (
@@ -670,10 +973,20 @@ export default function AdminDashboardPage() {
                 <h4 className="mt-2 font-medium text-gray-900">No projects yet</h4>
                 <p className="text-sm text-gray-500 mt-1">Create your first project to get started</p>
               </div>
-            ) : (
+            ) : projectViewMode === 'card' ? (
               <div className="space-y-4">
                 {stats.recentProjects.slice(0, 5).map((project) => (
                   <ProjectCard
+                    key={project._id}
+                    project={project}
+                    onClick={() => navigate(`/projects/${project._id}`)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {stats.recentProjects.slice(0, 5).map((project) => (
+                  <ProjectRow
                     key={project._id}
                     project={project}
                     onClick={() => navigate(`/projects/${project._id}`)}
@@ -685,7 +998,7 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Team Members */}
-        <div className="chart-container">
+        <div className="chart-container-enhanced">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className="text-lg font-semibold text-gray-900">Team Members</h3>
@@ -731,28 +1044,20 @@ export default function AdminDashboardPage() {
         </button>
         <button
           onClick={() => navigate('/team')}
-          className="p-4 bg-dark-300 rounded-2xl text-white text-left hover:bg-dark-200 transition-all duration-200"
+          className="enhanced-card p-4 text-gray-900 text-left"
         >
           <UserPlus size={24} className="mb-2 text-primary-500" />
           <p className="font-semibold">Add Team Member</p>
-          <p className="text-sm text-gray-400 mt-1">Invite new members</p>
+          <p className="text-sm text-gray-500 mt-1">Invite new members</p>
         </button>
         <button
           onClick={() => navigate('/projects')}
-          className="p-4 bg-white border border-gray-200 rounded-2xl text-gray-900 text-left hover:border-primary-300 transition-all duration-200"
+          className="enhanced-card p-4 text-gray-900 text-left"
         >
           <Briefcase size={24} className="mb-2 text-green-500" />
           <p className="font-semibold">All Projects</p>
           <p className="text-sm text-gray-500 mt-1">View and manage projects</p>
         </button>
-        {/* <button
-          onClick={() => navigate('/settings')}
-          className="p-4 bg-white border border-gray-200 rounded-2xl text-gray-900 text-left hover:border-primary-300 transition-all duration-200"
-        >
-          <Settings size={24} className="mb-2 text-purple-500" />
-          <p className="font-semibold">Settings</p>
-          <p className="text-sm text-gray-500 mt-1">Configure your workspace</p>
-        </button> */}
       </div>
 
       {/* Strategy Detail Modal */}
