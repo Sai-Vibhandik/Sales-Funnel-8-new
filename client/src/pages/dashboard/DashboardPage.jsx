@@ -13,12 +13,15 @@ export default function DashboardPage() {
       return <AdminDashboardPage />;
     case 'performance_marketer':
       return <PerformanceMarketerDashboard user={user} />;
+    case 'content_writer':
+    case 'video_editor':
     case 'ui_ux_designer':
     case 'graphic_designer':
     case 'developer':
     case 'tester':
       return <TeamMemberDashboard user={user} />;
     default:
-      return <PerformanceMarketerDashboard user={user} />;
+      // Fallback to team member dashboard for unknown team roles
+      return <TeamMemberDashboard user={user} />;
   }
 }

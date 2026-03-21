@@ -1,20 +1,258 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
-import { Card, CardBody, CardHeader, Button, Badge, ProgressBar, Spinner, EmptyState } from '@/components/ui';
-import { FolderKanban, Plus, Search, Filter, Trash2, MoreVertical } from 'lucide-react';
-import { formatDate, getStageName, getStatusColor } from '@/lib/utils';
+import { projectService } from '@/services/api';
+import { Spinner, Badge } from '@/components/ui';
+import {
+  FolderKanban,
+  Search,
+  Plus,
+  Trash2,
+  Calendar,
+  Briefcase,
+  ChevronRight,
+  Grid3x3,
+  List,
+  Filter,
+  X,
+  AlertCircle,
+  ArrowRight,
+} from 'lucide-react';
+import { cn, formatDate } from '@/lib/utils';
 
-// Role labels for display
-const roleLabels = {
-  admin: 'Admin',
-  performance_marketer: 'Performance Marketer',
-  ui_ux_designer: 'UI/UX Designer',
-  graphic_designer: 'Graphic Designer',
-  developer: 'Developer',
-  tester: 'Tester',
+// Stage configuration
+const STAGE_ICONS = {
+  marketResearch: Search,
+  offerEngineering: 'Gift',
+  trafficStrategy: 'TrendingUp',
+  landingPage: 'FileText',
+  creativeStrategy: 'Lightbulb',
 };
+
+const STAGE_NAMES = {
+  onboarding: 'Onboarding',
+  marketResearch: 'Market Research',
+  offerEngineering: 'Offer Engineering',
+  trafficStrategy: 'Traffic Strategy',
+  landingPage: 'Landing Page',
+  creativeStrategy: 'Creative Strategy',
+};
+
+// Project Card Component
+function ProjectCard({ project, onDelete, isAdmin, navigate }) {
+  const stageKeys = ['onboarding', 'marketResearch', 'offerEngineering', 'trafficStrategy', 'landingPage', 'creativeStrategy'];
+  const completedStages = stageKeys.filter(key => project.stages?.[key]?.isCompleted).length;
+  const progressPercent = (completedStages / stageKeys.length) * 100;
+
+  // Get status badge
+  const getStatusBadge = () => {
+    switch (project.status) {
+      case 'completed':
+        return { bg: 'bg-green-100', text: 'text-green-700', label: 'Completed', dot: 'bg-green-500' };
+      case 'paused':
+        return { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Paused', dot: 'bg-yellow-500' };
+      case 'archived':
+        return { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Archived', dot: 'bg-gray-400' };
+      case 'active':
+      default:
+        return { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Active', dot: 'bg-blue-500' };
+    }
+  };
+
+  // Get current stage
+  const getCurrentStage = () => {
+    for (let i = 0; i < stageKeys.length; i++) {
+      if (!project.stages?.[stageKeys[i]]?.isCompleted) {
+        return { key: stageKeys[i], name: STAGE_NAMES[stageKeys[i]], index: i + 1 };
+      }
+    }
+    return { key: 'creativeStrategy', name: 'Creative Strategy', index: 6 };
+  };
+
+  const status = getStatusBadge();
+  const currentStage = getCurrentStage();
+
+  return (
+    <div
+      onClick={() => navigate(`/projects/${project._id}`)}
+      className="project-card-enhanced"
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center flex-shrink-0">
+            <Briefcase size={18} className="text-white" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="font-semibold text-gray-900 truncate">{project.projectName || project.businessName}</h3>
+            <p className="text-sm text-gray-500 truncate">{project.customerName}</p>
+          </div>
+        </div>
+        <Badge className={cn(status.bg, status.text, 'flex-shrink-0')}>
+          <span className={cn('w-1.5 h-1.5 rounded-full mr-1.5', status.dot)} />
+          {status.label}
+        </Badge>
+      </div>
+
+      {/* Industry Tag */}
+      {project.industry && (
+        <div className="mb-3">
+          <span className="inline-flex items-center px-2.5 py-1 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium">
+            {project.industry}
+          </span>
+        </div>
+      )}
+
+      {/* Strategy Progress */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between text-sm mb-2">
+          <span className="text-gray-500">Strategy Progress</span>
+          <span className="font-medium text-gray-900">{completedStages}/{stageKeys.length} stages</span>
+        </div>
+        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{
+              width: `${progressPercent}%`,
+              background: progressPercent >= 100
+                ? '#10B981'
+                : 'linear-gradient(90deg, #FFC107 0%, #FFD54F 100%)'
+            }}
+          />
+        </div>
+        {progressPercent < 100 && (
+          <p className="text-xs text-gray-500 mt-1.5">
+            Current: {currentStage.name}
+          </p>
+        )}
+        {progressPercent === 100 && (
+          <p className="text-xs text-gray-500 mt-1.5">
+            ✓ Strategy complete, awaiting execution
+          </p>
+        )}
+      </div>
+
+      {/* Team Avatars (Admin only) */}
+      {isAdmin && project.assignedTeam && (
+        <div className="flex items-center gap-2 mb-3 p-2 bg-gray-50 rounded-lg">
+          <span className="text-xs text-gray-500">Team:</span>
+          <div className="flex -space-x-2">
+            {project.assignedTeam.performanceMarketer && (
+              <div className="w-6 h-6 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center ring-2 ring-white">
+                {project.assignedTeam.performanceMarketer.name?.charAt(0)}
+              </div>
+            )}
+            {project.assignedTeam.uiUxDesigner && (
+              <div className="w-6 h-6 rounded-full bg-purple-500 text-white text-xs flex items-center justify-center ring-2 ring-white">
+                {project.assignedTeam.uiUxDesigner.name?.charAt(0)}
+              </div>
+            )}
+            {project.assignedTeam.graphicDesigner && (
+              <div className="w-6 h-6 rounded-full bg-pink-500 text-white text-xs flex items-center justify-center ring-2 ring-white">
+                {project.assignedTeam.graphicDesigner.name?.charAt(0)}
+              </div>
+            )}
+            {project.assignedTeam.developer && (
+              <div className="w-6 h-6 rounded-full bg-green-500 text-white text-xs flex items-center justify-center ring-2 ring-white">
+                {project.assignedTeam.developer.name?.charAt(0)}
+              </div>
+            )}
+            {project.assignedTeam.tester && (
+              <div className="w-6 h-6 rounded-full bg-orange-500 text-white text-xs flex items-center justify-center ring-2 ring-white">
+                {project.assignedTeam.tester.name?.charAt(0)}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Footer */}
+      <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+        <div className="flex items-center gap-1.5 text-xs text-gray-400">
+          <Calendar size={14} />
+          <span>{formatDate(project.updatedAt)}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(project._id);
+              }}
+              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              title="Delete project"
+            >
+              <Trash2 size={16} />
+            </button>
+          )}
+          <ChevronRight size={18} className="text-gray-400" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Delete Confirmation Modal
+function DeleteModal({ isOpen, projectId, projectName, onConfirm, onCancel, isDeleting }) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
+      <div className="relative bg-white rounded-2xl shadow-xl max-w-md w-full p-6 animate-fadeIn">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
+            <AlertCircle size={20} className="text-red-600" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900">Delete Project</h3>
+        </div>
+        <p className="text-gray-600 mb-4">
+          Are you sure you want to delete <span className="font-medium text-gray-900">{projectName}</span>? This action cannot be undone.
+        </p>
+        <ul className="text-sm text-gray-500 mb-6 space-y-1">
+          <li className="flex items-center gap-2">
+            <span className="w-1 h-1 bg-gray-400 rounded-full" />
+            All project data and settings
+          </li>
+          <li className="flex items-center gap-2">
+            <span className="w-1 h-1 bg-gray-400 rounded-full" />
+            All tasks and strategy documents
+          </li>
+          <li className="flex items-center gap-2">
+            <span className="w-1 h-1 bg-gray-400 rounded-full" />
+            All landing pages and assets
+          </li>
+        </ul>
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={isDeleting}
+            className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors flex items-center gap-2 disabled:opacity-50"
+          >
+            {isDeleting ? (
+              <>
+                <Spinner size="sm" />
+                Deleting...
+              </>
+            ) : (
+              <>
+                <Trash2 size={16} />
+                Delete Project
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function ProjectsListPage() {
   const navigate = useNavigate();
@@ -23,8 +261,10 @@ export default function ProjectsListPage() {
   const [projects, setProjects] = useState([]);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
-  const [deleting, setDeleting] = useState(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+  const [showDeleteModal, setShowDeleteModal] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
 
   const isAdmin = user?.role === 'admin';
 
@@ -35,9 +275,8 @@ export default function ProjectsListPage() {
   const fetchProjects = async () => {
     try {
       setLoading(true);
-      const { projectService } = await import('@/services/api');
       const response = await projectService.getProjects({ status, search });
-      setProjects(response.data);
+      setProjects(response.data || []);
     } catch (error) {
       toast.error('Failed to load projects');
     } finally {
@@ -50,31 +289,33 @@ export default function ProjectsListPage() {
     fetchProjects();
   };
 
-  const handleDeleteProject = async (projectId, e) => {
-    e.stopPropagation();
-    setShowDeleteConfirm(projectId);
+  const handleDeleteClick = (projectId) => {
+    setShowDeleteModal(projectId);
   };
 
-  const confirmDelete = async (projectId) => {
+  const confirmDelete = async () => {
     try {
-      setDeleting(projectId);
-      const { projectService } = await import('@/services/api');
-      await projectService.deleteProject(projectId);
-
-      // Remove from local state
-      setProjects(projects.filter(p => p._id !== projectId));
+      setDeleting(true);
+      await projectService.deleteProject(showDeleteModal);
+      setProjects(projects.filter(p => p._id !== showDeleteModal));
       toast.success('Project deleted successfully');
     } catch (error) {
-      console.error('Delete error:', error);
       toast.error(error?.response?.data?.message || 'Failed to delete project');
     } finally {
-      setDeleting(null);
-      setShowDeleteConfirm(null);
+      setDeleting(false);
+      setShowDeleteModal(null);
     }
   };
 
-  const cancelDelete = () => {
-    setShowDeleteConfirm(null);
+  const projectToDelete = projects.find(p => p._id === showDeleteModal);
+
+  // Filter counts
+  const statusCounts = {
+    all: projects.length,
+    active: projects.filter(p => p.status === 'active').length,
+    paused: projects.filter(p => p.status === 'paused').length,
+    completed: projects.filter(p => p.status === 'completed').length,
+    archived: projects.filter(p => p.status === 'archived').length,
   };
 
   if (loading) {
@@ -86,78 +327,61 @@ export default function ProjectsListPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Project</h3>
-            <p className="text-gray-600 mb-4">
-              Are you sure you want to delete this project? This action cannot be undone and will permanently remove:
-            </p>
-            <ul className="text-sm text-gray-500 mb-6 list-disc list-inside space-y-1">
-              <li>All project data and settings</li>
-              <li>All tasks associated with the project</li>
-              <li>All strategy documents (Market Research, Offer, Traffic Strategy, Creative Strategy)</li>
-              <li>All landing pages</li>
-              <li>All notifications related to this project</li>
-            </ul>
-            <div className="flex justify-end gap-3">
-              <Button variant="secondary" onClick={cancelDelete}>
-                Cancel
-              </Button>
-              <Button
-                variant="danger"
-                onClick={() => confirmDelete(showDeleteConfirm)}
-                loading={deleting === showDeleteConfirm}
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete Project
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+    <div className="space-y-6 animate-fadeIn">
+      {/* Delete Modal */}
+      <DeleteModal
+        isOpen={!!showDeleteModal}
+        projectId={showDeleteModal}
+        projectName={projectToDelete?.projectName || projectToDelete?.businessName}
+        onConfirm={confirmDelete}
+        onCancel={() => setShowDeleteModal(null)}
+        isDeleting={deleting}
+      />
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            {isAdmin ? 'Projects' : 'My Projects'}
+            {isAdmin ? 'All Projects' : 'My Projects'}
           </h1>
-          <p className="text-gray-600 mt-1">
-            {isAdmin
-              ? 'Manage all client projects and assign teams.'
-              : 'View and work on your assigned projects.'}
+          <p className="text-gray-500 mt-1">
+            {isAdmin ? 'Manage all client projects' : 'Projects assigned to you'}
           </p>
         </div>
-        {/* Only Admin can create new projects */}
         {isAdmin && (
-          <Button onClick={() => navigate('/projects/new')}>
-            <Plus className="w-4 h-4 mr-2" />
+          <button
+            onClick={() => navigate('/projects/new')}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white font-medium rounded-xl shadow-lg shadow-primary-500/25 hover:shadow-xl hover:shadow-primary-500/30 transition-all"
+          >
+            <Plus size={18} />
             New Project
-          </Button>
+          </button>
         )}
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardBody className="p-4">
-          <form onSubmit={handleSearch} className="flex gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+      {/* Search and Filters */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.02),0_4px_12px_rgba(0,0,0,0.04)] p-4">
+        <div className="flex flex-col sm:flex-row gap-4">
+          {/* Search */}
+          <form onSubmit={handleSearch} className="flex-1">
+            <div className="relative">
+              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search projects..."
+                placeholder="Search projects by name or client..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 focus:bg-white transition-all"
               />
             </div>
+          </form>
+
+          {/* Status Filter */}
+          <div className="flex items-center gap-2">
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
             >
               <option value="">All Status</option>
               <option value="active">Active</option>
@@ -165,140 +389,100 @@ export default function ProjectsListPage() {
               <option value="completed">Completed</option>
               <option value="archived">Archived</option>
             </select>
-            <Button type="submit" variant="secondary">
-              <Filter className="w-4 h-4 mr-2" />
-              Filter
-            </Button>
-          </form>
-        </CardBody>
-      </Card>
 
-      {/* Projects Grid */}
-      {projects.length === 0 ? (
-        <Card>
-          <CardBody className="py-12">
-            <EmptyState
-              icon={FolderKanban}
-              title={isAdmin ? "No projects found" : "No assigned projects"}
-              description={
-                isAdmin
-                  ? "Get started by creating your first project."
-                  : "You haven't been assigned to any projects yet. Contact your administrator."
-              }
-              action={
-                isAdmin && (
-                  <Button onClick={() => navigate('/projects/new')}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create Project
-                  </Button>
-                )
-              }
-            />
-          </CardBody>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {projects.map((project) => (
-            <Card
-              key={project._id}
-              className="hover:shadow-md transition-shadow relative"
-            >
-              {/* Delete button for admin */}
-              {isAdmin && (
-                <button
-                  onClick={(e) => handleDeleteProject(project._id, e)}
-                  className="absolute top-4 right-4 p-2 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors z-10"
-                  title="Delete project"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
-
-              <div
-                className="cursor-pointer"
-                onClick={() => navigate(`/projects/${project._id}`)}
+            {/* View Toggle */}
+            <div className="flex items-center bg-gray-100 rounded-xl p-1">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={cn(
+                  'p-2 rounded-lg transition-all',
+                  viewMode === 'grid' ? 'bg-white shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                )}
               >
-                <CardBody className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="pr-8">
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        {project.projectName || project.businessName}
-                      </h3>
-                      <p className="text-sm text-gray-500">{project.customerName}</p>
-                      {project.industry && (
-                        <span className="inline-block mt-1 px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded">
-                          {project.industry}
-                        </span>
-                      )}
-                    </div>
-                    <Badge className='mr-5' variant={project.status === 'active' ? 'success' : 'default'}>
-                      {project.status}
-                    </Badge>
-                  </div>
+                <Grid3x3 size={18} />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={cn(
+                  'p-2 rounded-lg transition-all',
+                  viewMode === 'list' ? 'bg-white shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                )}
+              >
+                <List size={18} />
+              </button>
+            </div>
+          </div>
+        </div>
 
-                  <div className="space-y-3">
-                    <div>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span className="text-gray-600">Progress</span>
-                        <span className="font-medium text-gray-900">
-                          {project.overallProgress}%
-                        </span>
-                      </div>
-                      <ProgressBar
-                        value={project.overallProgress}
-                        color={project.overallProgress >= 100 ? 'success' : 'primary'}
-                      />
-                    </div>
+        {/* Status Filter Pills */}
+        <div className="flex items-center gap-2 mt-4 pt-4 border-t border-gray-100">
+          <span className="text-sm text-gray-500 mr-2">Filter:</span>
+          {[
+            { value: '', label: 'All', count: statusCounts.all },
+            { value: 'active', label: 'Active', count: statusCounts.active },
+            { value: 'paused', label: 'Paused', count: statusCounts.paused },
+            { value: 'completed', label: 'Completed', count: statusCounts.completed },
+            { value: 'archived', label: 'Archived', count: statusCounts.archived },
+          ].map((filter) => (
+            <button
+              key={filter.value}
+              onClick={() => setStatus(filter.value)}
+              className={cn(
+                'px-3 py-1.5 text-sm font-medium rounded-lg transition-all',
+                status === filter.value
+                  ? 'bg-primary-500 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              )}
+            >
+              {filter.label}
+              {filter.count > 0 && (
+                <span className={cn('ml-1.5 text-xs', status === filter.value ? 'text-white/80' : 'text-gray-400')}>
+                  ({filter.count})
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
 
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Current Stage</span>
-                      <span className="font-medium text-gray-900">
-                        {getStageName(project.stages ? Object.keys(project.stages)[project.currentStage - 1] : 'onboarding')}
-                      </span>
-                    </div>
-
-                    {/* Show team for admin */}
-                    {isAdmin && project.assignedTeam && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600">Team</span>
-                        <div className="flex -space-x-2">
-                          {project.assignedTeam.performanceMarketer && (
-                            <div className="w-6 h-6 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center">
-                              {project.assignedTeam.performanceMarketer.name?.charAt(0)}
-                            </div>
-                          )}
-                          {project.assignedTeam.uiUxDesigner && (
-                            <div className="w-6 h-6 rounded-full bg-purple-500 text-white text-xs flex items-center justify-center">
-                              {project.assignedTeam.uiUxDesigner.name?.charAt(0)}
-                            </div>
-                          )}
-                          {project.assignedTeam.graphicDesigner && (
-                            <div className="w-6 h-6 rounded-full bg-pink-500 text-white text-xs flex items-center justify-center">
-                              {project.assignedTeam.graphicDesigner.name?.charAt(0)}
-                            </div>
-                          )}
-                          {project.assignedTeam.developer && (
-                            <div className="w-6 h-6 rounded-full bg-green-500 text-white text-xs flex items-center justify-center">
-                              {project.assignedTeam.developer.name?.charAt(0)}
-                            </div>
-                          )}
-                          {project.assignedTeam.tester && (
-                            <div className="w-6 h-6 rounded-full bg-orange-500 text-white text-xs flex items-center justify-center">
-                              {project.assignedTeam.tester.name?.charAt(0)}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Last Updated</span>
-                      <span className="text-gray-500">{formatDate(project.updatedAt)}</span>
-                    </div>
-                  </div>
-                </CardBody>
-              </div>
-            </Card>
+      {/* Projects */}
+      {projects.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
+            <FolderKanban size={32} className="text-gray-400" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            {isAdmin ? 'No projects found' : 'No assigned projects'}
+          </h3>
+          <p className="text-gray-500 mb-6 max-w-sm mx-auto">
+            {isAdmin
+              ? 'Get started by creating your first project.'
+              : "You haven't been assigned to any projects yet. Contact your administrator."}
+          </p>
+          {isAdmin && (
+            <button
+              onClick={() => navigate('/projects/new')}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white font-medium rounded-xl shadow-lg shadow-primary-500/25 hover:shadow-xl transition-all"
+            >
+              <Plus size={18} />
+              Create Project
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className={cn(
+          viewMode === 'grid'
+            ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
+            : 'space-y-4'
+        )}>
+          {projects.map((project) => (
+            <ProjectCard
+              key={project._id}
+              project={project}
+              onDelete={handleDeleteClick}
+              isAdmin={isAdmin}
+              navigate={navigate}
+            />
           ))}
         </div>
       )}
