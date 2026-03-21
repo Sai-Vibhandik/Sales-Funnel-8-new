@@ -199,3 +199,133 @@
 .yellow-glow {
   box-shadow: 0 0 20px rgba(255, 193, 7, 0.3);
 }
+
+/* Enhanced Card Styles with Shadows */
+.enhanced-card {
+  @apply bg-white rounded-2xl border border-gray-100;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+}
+
+.enhanced-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+/* Enhanced Stat Card with Icon */
+.stat-card-enhanced {
+  @apply relative overflow-hidden bg-white rounded-2xl p-6 border border-gray-100;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+}
+
+.stat-card-enhanced:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+/* Role Icon Container */
+.role-icon-container {
+  @apply w-10 h-10 rounded-xl flex items-center justify-center;
+  transition: transform 0.2s ease;
+}
+
+.role-icon-container:hover {
+  transform: scale(1.05);
+}
+
+/* Kanban Column Styles */
+.kanban-column {
+  @apply bg-gray-50 rounded-2xl p-4 min-h-[500px];
+  transition: all 0.2s ease;
+}
+
+.kanban-column-header {
+  @apply font-semibold text-gray-700 mb-4 flex items-center gap-2;
+}
+
+/* Kanban Card */
+.kanban-card {
+  @apply bg-white rounded-xl p-4 mb-3 border border-gray-100 cursor-pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: all 0.2s ease;
+}
+
+.kanban-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* Chart Container Enhanced */
+.chart-container-enhanced {
+  @apply bg-white rounded-2xl p-6 border border-gray-100;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+}
+
+.chart-container-enhanced:hover {
+  box-shadow: 0 6px 25px rgba(0, 0, 0, 0.1);
+}
+
+/* Team Member Card Enhanced */
+.team-member-card-enhanced {
+  @apply p-4 bg-white rounded-xl border border-gray-100 cursor-pointer;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+}
+
+.team-member-card-enhanced:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  border-color: rgba(255, 193, 7, 0.3);
+}
+
+/* Project Card Enhanced */
+.project-card-enhanced {
+  @apply p-4 bg-white rounded-xl border border-gray-100 cursor-pointer;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+}
+
+.project-card-enhanced:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  border-color: rgba(255, 193, 7, 0.3);
+}
+
+/* Icon Badge */
+.icon-badge {
+  @apply p-2 rounded-xl;
+}
+
+.icon-badge-primary {
+  @apply bg-primary-100 text-primary-600;
+}
+
+.icon-badge-success {
+  @apply bg-green-100 text-green-600;
+}
+
+.icon-badge-info {
+  @apply bg-blue-100 text-blue-600;
+}
+
+.icon-badge-purple {
+  @apply bg-purple-100 text-purple-600;
+}
+
+.icon-badge-pink {
+  @apply bg-pink-100 text-pink-600;
+}
+
+.icon-badge-orange {
+  @apply bg-orange-100 text-orange-600;
+}
+
+.icon-badge-cyan {
+  @apply bg-cyan-100 text-cyan-600;
+}
+
+.icon-badge-emerald {
+  @apply bg-emerald-100 text-emerald-600;
+}
