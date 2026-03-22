@@ -824,12 +824,16 @@ exports.getDashboardStats = async (req, res, next) => {
     const [
       totalProjects,
       activeProjects,
+      pausedProjects,
       completedProjects,
+      archivedProjects,
       recentProjects
     ] = await Promise.all([
       Project.countDocuments(query),
-      Project.countDocuments({ ...query, status: 'active', isActive: true }),
+      Project.countDocuments({ ...query, status: 'active' }),
+      Project.countDocuments({ ...query, status: 'paused' }),
       Project.countDocuments({ ...query, status: 'completed' }),
+      Project.countDocuments({ ...query, status: 'archived' }),
       Project.find(query)
         .sort({ updatedAt: -1 })
         .limit(5)
@@ -853,7 +857,9 @@ exports.getDashboardStats = async (req, res, next) => {
       data: {
         totalProjects,
         activeProjects,
+        pausedProjects,
         completedProjects,
+        archivedProjects,
         recentProjects,
         projectsByStage
       }

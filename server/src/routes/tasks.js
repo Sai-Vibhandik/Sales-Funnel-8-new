@@ -24,7 +24,8 @@ const {
   getMyRoleTasks,
   getMyCreativeTasks,
   getPMProjectsWithAssets,
-  getPMProjectAssets
+  getPMProjectAssets,
+  getTaskStats
 } = require('../controllers/taskController');
 
 // All routes require authentication
@@ -51,6 +52,9 @@ router.get('/by-role/:role', getTasksByRole);
 
 // Get tasks pending tester review (Testers/Admin only)
 router.get('/pending-review', authorize('tester', 'admin'), getPendingReviewTasks);
+
+// Get task statistics for dashboard (by role)
+router.get('/stats/:role', getTaskStats);
 
 // Get approved assets (Testers/Admin/Performance Marketer)
 router.get('/approved-assets', authorize('tester', 'admin', 'performance_marketer'), getApprovedAssets);

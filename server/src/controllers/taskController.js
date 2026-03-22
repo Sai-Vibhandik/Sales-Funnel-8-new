@@ -5,6 +5,19 @@ const Notification = require('../models/Notification');
 const CreativeStrategy = require('../models/Creative');
 const { generateTasksFromStrategy } = require('../services/taskGenerationService');
 
+// Import centralized status constants
+const {
+  PENDING_STATUSES,
+  SUBMITTED_STATUSES,
+  APPROVED_STATUSES,
+  FINAL_STATUSES,
+  REJECTED_STATUSES,
+  STATUS_CONFIG,
+  getStatusConfig,
+  getInitialStatus,
+  getValidTransitions
+} = require('../constants/taskStatuses');
+
 // Helper to check project access
 const checkProjectAccess = async (projectId, user) => {
   const project = await Project.findById(projectId)
@@ -1222,15 +1235,9 @@ exports.getPendingReviewTasks = async (req, res, next) => {
       });
     }
 
-    const pendingStatuses = [
-      'submitted',
-      'content_submitted',
-      'design_submitted',
-      'development_submitted'
-    ];
-
+    // Use centralized SUBMITTED_STATUSES from constants
     const tasks = await Task.find({
-      status: { $in: pendingStatuses }
+      status: { $in: SUBMITTED_STATUSES }
     })
       .populate('projectId', 'projectName businessName industry')
       .populate('assignedTo', 'name email role')
@@ -1269,16 +1276,10 @@ exports.getPendingMarketerApproval = async (req, res, next) => {
 
     const projectIds = projects.map(p => p._id);
 
-    const pendingStatuses = [
-      'approved_by_tester',
-      'content_approved',
-      'design_approved',
-      'development_approved'
-    ];
-
+    // Use centralized APPROVED_STATUSES from constants
     const tasks = await Task.find({
       projectId: { $in: projectIds },
-      status: { $in: pendingStatuses }
+      status: { $in: APPROVED_STATUSES }
     })
       .populate('projectId', 'projectName businessName industry')
       .populate('assignedTo', 'name email role')
@@ -1304,15 +1305,8 @@ exports.getPendingMarketerApproval = async (req, res, next) => {
 exports.getApprovedAssets = async (req, res, next) => {
   try {
     // Get tasks that have been approved by tester or are fully approved
-    // These are tasks in: approved_by_tester, content_approved, design_approved, development_approved, final_approved
-    const approvedStatuses = [
-      'approved_by_tester',
-      'content_approved',
-      'design_approved',
-      'development_approved',
-      'final_approved',
-      'content_final_approved'
-    ];
+    // Use centralized constants: APPROVED_STATUSES + FINAL_STATUSES
+    const approvedStatuses = [...APPROVED_STATUSES, ...FINAL_STATUSES];
 
     const tasks = await Task.find({
       status: { $in: approvedStatuses }
@@ -1353,15 +1347,8 @@ exports.getProjectCompletedAssets = async (req, res, next) => {
       });
     }
 
-    // Get completed/approved statuses
-    const completedStatuses = [
-      'approved_by_tester',
-      'content_approved',
-      'design_approved',
-      'development_approved',
-      'final_approved',
-      'content_final_approved'
-    ];
+    // Get completed/approved statuses using centralized constants
+    const completedStatuses = [...APPROVED_STATUSES, ...FINAL_STATUSES];
 
     const tasks = await Task.find({
       projectId,
@@ -1795,59 +1782,7 @@ exports.getMyCreativeTasks = async (req, res, next) => {
   }
 };
 
-// Helper function to get valid status transitions
-function getValidTransitions(currentStatus, taskType) {
-  // Landing page design has a different workflow - goes to development after approval
-  if (taskType === 'landing_page_design') {
-    const landingPageDesignTransitions = {
-      design_pending: ['design_submitted'],
-      design_submitted: ['design_approved', 'design_rejected'],
-      design_approved: ['development_pending', 'design_rejected'], // Marketer can send to development
-      design_rejected: ['design_submitted']
-    };
-    return landingPageDesignTransitions[currentStatus] || [];
-  }
-
-  // Landing page development workflow
-  if (taskType === 'landing_page_development') {
-    const landingPageDevTransitions = {
-      development_pending: ['development_submitted'],
-      development_submitted: ['development_approved', 'development_pending'], // Reject goes back to pending
-      development_approved: ['final_approved', 'development_pending'] // Marketer approves to final, or rejects
-    };
-    return landingPageDevTransitions[currentStatus] || [];
-  }
-
-  const transitions = {
-    // Standard creative workflow
-    todo: ['in_progress'],
-    in_progress: ['submitted'],
-    submitted: ['approved_by_tester', 'rejected'],
-    approved_by_tester: ['final_approved', 'rejected'],
-    rejected: ['in_progress', 'submitted'],
-    final_approved: [],
-
-    // Content creation workflow
-    content_pending: ['content_submitted'],
-    content_submitted: ['content_final_approved', 'content_rejected'], // Tester approves directly to design (skip marketer)
-    content_approved: ['content_final_approved', 'content_rejected'], // Legacy - marketer approval (not used in new flow)
-    content_rejected: ['content_submitted'],
-    content_final_approved: ['design_pending'],
-
-    // Design workflow (for graphic design/video tasks after content approval)
-    design_pending: ['design_submitted'],
-    design_submitted: ['design_approved', 'design_rejected'],
-    design_approved: ['final_approved', 'design_rejected'],
-    design_rejected: ['design_submitted'],
-
-    // Landing page development (fallback)
-    development_pending: ['development_submitted'],
-    development_submitted: ['development_approved', 'development_pending'],
-    development_approved: ['final_approved', 'rejected']
-  };
-
-  return transitions[currentStatus] || [];
-}
+// Note: getValidTransitions is imported from constants/taskStatuses.js
 
 // @desc    Get projects with approved assets for Performance Marketer
 // @route   GET /api/tasks/pm-projects-with-assets
@@ -1871,12 +1806,12 @@ exports.getPMProjectsWithAssets = async (req, res, next) => {
       .select('_id projectName businessName industry status isActive')
       .sort({ updatedAt: -1 });
 
-    // Status categories
-    const pendingStatuses = ['todo', 'in_progress', 'content_pending', 'design_pending', 'development_pending'];
-    const submittedStatuses = ['content_submitted', 'design_submitted', 'development_submitted', 'submitted'];
-    const approvedStatuses = ['approved_by_tester', 'content_approved', 'design_approved', 'development_approved', 'content_final_approved'];
-    const finalApprovedStatuses = ['final_approved'];
-    const rejectedStatuses = ['rejected', 'content_rejected', 'design_rejected'];
+    // Status categories - use centralized constants
+    const pendingStatuses = PENDING_STATUSES;
+    const submittedStatuses = SUBMITTED_STATUSES;
+    const approvedStatuses = APPROVED_STATUSES;
+    const finalApprovedStatuses = FINAL_STATUSES;
+    const rejectedStatuses = REJECTED_STATUSES;
 
     // Get assets for each project
     const projectsWithAssets = await Promise.all(
@@ -1992,12 +1927,12 @@ exports.getPMProjectAssets = async (req, res, next) => {
       }
     }
 
-    // Status categories
-    const pendingStatuses = ['todo', 'in_progress', 'content_pending', 'design_pending', 'development_pending'];
-    const submittedStatuses = ['content_submitted', 'design_submitted', 'development_submitted', 'submitted'];
-    const approvedStatuses = ['approved_by_tester', 'content_approved', 'design_approved', 'development_approved', 'content_final_approved'];
-    const finalApprovedStatuses = ['final_approved'];
-    const rejectedStatuses = ['rejected', 'content_rejected', 'design_rejected'];
+    // Status categories - use centralized constants
+    const pendingStatuses = PENDING_STATUSES;
+    const submittedStatuses = SUBMITTED_STATUSES;
+    const approvedStatuses = APPROVED_STATUSES;
+    const finalApprovedStatuses = FINAL_STATUSES;
+    const rejectedStatuses = REJECTED_STATUSES;
 
     // Get ALL tasks for this project
     const allTasks = await Task.find({ projectId })
@@ -2086,3 +2021,177 @@ async function notifyTesterForReview(task) {
     });
   }
 }
+
+// @desc    Get task statistics for dashboard
+// @route   GET /api/tasks/stats/:role
+// @access  Private
+exports.getTaskStats = async (req, res, next) => {
+  try {
+    const { role } = req.params;
+    const userId = req.user._id;
+    const userRole = req.user.role;
+
+    // Validate role parameter
+    const validRoles = ['content_writer', 'graphic_designer', 'developer', 'tester', 'performance_marketer', 'admin'];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid role specified'
+      });
+    }
+
+    // Non-admin users can only view their own role stats
+    if (userRole !== 'admin' && role !== userRole) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to view these statistics'
+      });
+    }
+
+    // Build query based on role
+    let query = {};
+
+    // Map frontend role names to database assignedRole values
+    const roleMap = {
+      'content_writer': 'content_writer',
+      'graphic_designer': 'graphic_designer',
+      'developer': 'developer',
+      'tester': 'tester',
+      'performance_marketer': 'performance_marketer'
+    };
+
+    if (role === 'admin') {
+      // Admin sees all tasks
+      query = {};
+    } else if (role === 'tester') {
+      // Tester sees tasks in submitted status for review
+      query = { status: { $in: SUBMITTED_STATUSES } };
+    } else {
+      // Other roles see tasks assigned to them
+      query = { assignedTo: userId };
+    }
+
+    // Get all relevant tasks
+    const tasks = await Task.find(query)
+      .populate('projectId', 'projectName businessName status')
+      .sort({ updatedAt: -1 });
+
+    // Calculate statistics based on role
+    let stats = {
+      total: tasks.length,
+      pending: 0,
+      submitted: 0,
+      approved: 0,
+      rejected: 0,
+      byStatus: {},
+      byType: {},
+      recentTasks: []
+    };
+
+    if (role === 'content_writer') {
+      // Content writer statistics
+      stats.pending = tasks.filter(t =>
+        ['todo', 'in_progress', 'content_pending'].includes(t.status)
+      ).length;
+      stats.submitted = tasks.filter(t =>
+        t.status === 'content_submitted'
+      ).length;
+      stats.approved = tasks.filter(t =>
+        ['content_final_approved', 'final_approved'].includes(t.status)
+      ).length;
+      stats.rejected = tasks.filter(t =>
+        t.status === 'content_rejected'
+      ).length;
+
+    } else if (role === 'graphic_designer') {
+      // Graphic designer statistics
+      stats.pending = tasks.filter(t =>
+        ['todo', 'in_progress', 'design_pending'].includes(t.status)
+      ).length;
+      stats.submitted = tasks.filter(t =>
+        t.status === 'design_submitted'
+      ).length;
+      stats.approved = tasks.filter(t =>
+        ['design_approved', 'final_approved'].includes(t.status)
+      ).length;
+      stats.rejected = tasks.filter(t =>
+        ['design_rejected', 'rejected'].includes(t.status)
+      ).length;
+
+    } else if (role === 'developer') {
+      // Developer statistics
+      stats.pending = tasks.filter(t =>
+        ['todo', 'in_progress', 'development_pending'].includes(t.status)
+      ).length;
+      stats.submitted = tasks.filter(t =>
+        t.status === 'development_submitted'
+      ).length;
+      stats.approved = tasks.filter(t =>
+        ['development_approved', 'final_approved'].includes(t.status)
+      ).length;
+      stats.rejected = tasks.filter(t =>
+        t.status === 'rejected'
+      ).length;
+
+    } else if (role === 'tester') {
+      // Tester statistics - tasks pending review
+      stats.pendingReview = tasks.filter(t =>
+        SUBMITTED_STATUSES.includes(t.status)
+      ).length;
+
+      // Get approved/rejected counts from recently reviewed
+      const recentlyReviewed = await Task.find({
+        testerReviewedBy: userId,
+        updatedAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } // Last 7 days
+      });
+
+      stats.approved = recentlyReviewed.filter(t =>
+        APPROVED_STATUSES.includes(t.status)
+      ).length;
+      stats.rejected = recentlyReviewed.filter(t =>
+        REJECTED_STATUSES.includes(t.status)
+      ).length;
+      stats.total = stats.pendingReview + stats.approved + stats.rejected;
+
+    } else if (role === 'performance_marketer') {
+      // Performance marketer statistics
+      stats.pendingApproval = tasks.filter(t =>
+        APPROVED_STATUSES.includes(t.status) && !FINAL_STATUSES.includes(t.status)
+      ).length;
+      stats.approved = tasks.filter(t =>
+        FINAL_STATUSES.includes(t.status)
+      ).length;
+      stats.total = tasks.length;
+    }
+
+    // Group by status for chart data
+    tasks.forEach(task => {
+      const status = task.status;
+      stats.byStatus[status] = (stats.byStatus[status] || 0) + 1;
+    });
+
+    // Group by task type
+    tasks.forEach(task => {
+      const type = task.taskType || 'other';
+      stats.byType[type] = (stats.byType[type] || 0) + 1;
+    });
+
+    // Get recent tasks (last 5)
+    stats.recentTasks = tasks.slice(0, 5).map(task => ({
+      _id: task._id,
+      taskTitle: task.taskTitle,
+      taskType: task.taskType,
+      status: task.status,
+      creativeName: task.creativeName,
+      project: task.projectId,
+      updatedAt: task.updatedAt
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    next(error);
+  }
+};

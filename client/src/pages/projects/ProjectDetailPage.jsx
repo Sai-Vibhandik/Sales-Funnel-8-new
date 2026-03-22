@@ -20,9 +20,13 @@ import {
   Lock,
   Users,
   UserPlus,
-  Play,
+  ChevronDown,
+  Pause,
+  Archive,
+  CheckCircle2,
 } from 'lucide-react';
 import { formatDate, getStageName, STAGE_ORDER } from '@/lib/utils';
+import { PROJECT_STATUS_CONFIG, PROJECT_STATUS_VALUES, getProjectStatusConfig } from '@/constants/taskStatuses';
 
 const STAGE_ICONS = {
   onboarding: CheckCircle,
@@ -126,6 +130,8 @@ export default function ProjectDetailPage() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [project, setProject] = useState(null);
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
 
   const isAdmin = user?.role === 'admin';
   const isPerformanceMarketer = user?.role === 'performance_marketer';
@@ -160,6 +166,22 @@ export default function ProjectDetailPage() {
       navigate('/projects');
     } catch (error) {
       toast.error('Failed to delete project');
+    }
+  };
+
+  const handleStatusChange = async (newStatus) => {
+    if (!isAdmin) return;
+
+    try {
+      setUpdatingStatus(true);
+      await projectService.updateProject(id, { status: newStatus });
+      toast.success(`Project status updated to ${PROJECT_STATUS_CONFIG[newStatus]?.label || newStatus}`);
+      setProject(prev => ({ ...prev, status: newStatus }));
+      setStatusDropdownOpen(false);
+    } catch (error) {
+      toast.error('Failed to update project status');
+    } finally {
+      setUpdatingStatus(false);
     }
   };
 
@@ -253,35 +275,62 @@ export default function ProjectDetailPage() {
               <h1 className="text-2xl font-bold text-gray-900">
                 {project.projectName || project.businessName}
               </h1>
-              <Badge variant={project.status === 'active' ? 'success' : 'default'}>
-                {project.status}
-              </Badge>
-              {project.isActive ? (
-                <Badge className="bg-green-100 text-green-700">Active</Badge>
-              ) : (
-                <Badge className="bg-gray-100 text-gray-600">Inactive</Badge>
-              )}
+              {/* Status Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => isAdmin && setStatusDropdownOpen(!statusDropdownOpen)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium ${
+                    isAdmin ? 'cursor-pointer hover:opacity-80 transition-opacity' : 'cursor-default'
+                  } ${getProjectStatusConfig(project.status)?.bgColor || 'bg-gray-100'} ${getProjectStatusConfig(project.status)?.textColor || 'text-gray-800'}`}
+                  disabled={updatingStatus}
+                >
+                  {project.status === 'active' && <CheckCircle2 size={14} />}
+                  {project.status === 'paused' && <Pause size={14} />}
+                  {project.status === 'completed' && <CheckCircle size={14} />}
+                  {project.status === 'archived' && <Archive size={14} />}
+                  {getProjectStatusConfig(project.status)?.label || project.status}
+                  {isAdmin && <ChevronDown size={14} className={`transition-transform ${statusDropdownOpen ? 'rotate-180' : ''}`} />}
+                </button>
+
+                {/* Dropdown Menu */}
+                {isAdmin && statusDropdownOpen && (
+                  <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50 min-w-[140px]">
+                    {PROJECT_STATUS_VALUES.map((status) => {
+                      const config = getProjectStatusConfig(status);
+
+                      return (
+                        <button
+                          key={status}
+                          onClick={() => {
+                            handleStatusChange(status);
+                          }}
+                          disabled={updatingStatus}
+                          className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-gray-50 transition-colors ${
+                            project.status === status ? 'bg-gray-50 font-medium' : ''
+                          }`}
+                        >
+                          <span className={`${config.bgColor} ${config.textColor} px-2 py-0.5 rounded-full text-xs`}>
+                            {config.label}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
             <p className="text-gray-600 mt-1">{project.customerName}</p>
           </div>
         </div>
         <div className="flex gap-2">
           {isAdmin ? (
-            <>
-              <Button
-                variant="secondary"
-                onClick={() => navigate(`/projects/${id}/assign-team`)}
-              >
-                <Users className="w-4 h-4 mr-2" />
-                Assign Team
-              </Button>
-              {/* {!project.isActive && project.assignedTeam?.performanceMarketer && (
-                <Button onClick={handleActivate}>
-                  <Play className="w-4 h-4 mr-2" />
-                  Activate
-                </Button>
-              )} */}
-            </>
+            <Button
+              variant="secondary"
+              onClick={() => navigate(`/projects/${id}/assign-team`)}
+            >
+              <Users className="w-4 h-4 mr-2" />
+              Assign Team
+            </Button>
           ) : (
             <>
               <Button variant="secondary" onClick={() => navigate(`/projects/${id}/edit`)}>
@@ -296,6 +345,14 @@ export default function ProjectDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Click outside handler for dropdown */}
+      {statusDropdownOpen && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setStatusDropdownOpen(false)}
+        />
+      )}
 
       {/* Progress Overview */}
       <Card>

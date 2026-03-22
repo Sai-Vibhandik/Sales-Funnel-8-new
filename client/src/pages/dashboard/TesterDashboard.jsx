@@ -31,19 +31,9 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-
-// Status configuration for tasks in review
-const STATUS_CONFIG = {
-  submitted: { label: 'Pending Review', color: 'bg-yellow-100 text-yellow-700', chartColor: '#F59E0B' },
-  design_submitted: { label: 'Design Review', color: 'bg-yellow-100 text-yellow-700', chartColor: '#F59E0B' },
-  content_submitted: { label: 'Content Review', color: 'bg-orange-100 text-orange-700', chartColor: '#F97316' },
-  development_submitted: { label: 'Dev Review', color: 'bg-blue-100 text-blue-700', chartColor: '#3B82F6' },
-  approved_by_tester: { label: 'Approved', color: 'bg-green-100 text-green-700', chartColor: '#10B981' },
-  final_approved: { label: 'Final Approved', color: 'bg-emerald-100 text-emerald-700', chartColor: '#059669' },
-  rejected: { label: 'Rejected', color: 'bg-red-100 text-red-700', chartColor: '#EF4444' },
-  in_progress: { label: 'In Progress', color: 'bg-purple-100 text-purple-700', chartColor: '#8B5CF6' },
-  pending: { label: 'Pending', color: 'bg-gray-100 text-gray-700', chartColor: '#6B7280' },
-};
+import { STATUS_CONFIG, getStatusConfig, CHART_COLORS, CHART_PALETTE } from '@/constants/taskStatuses';
+import { EmptyState } from '@/components/ui';
+import { RefreshCw } from 'lucide-react';
 
 // Task type labels
 const TASK_TYPE_LABELS = {
@@ -87,7 +77,7 @@ function StatCard({ title, value, change, changeType, icon: Icon, iconBg }) {
 
 // Review Task Card Component
 function ReviewTaskCard({ task, onReview }) {
-  const statusConfig = STATUS_CONFIG[task.status] || STATUS_CONFIG.pending;
+  const statusConfig = getStatusConfig(task.status);
   const taskType = TASK_TYPE_LABELS[task.taskType] || task.taskType?.replace(/_/g, ' ') || 'Task';
 
   return (
@@ -95,7 +85,7 @@ function ReviewTaskCard({ task, onReview }) {
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-2">
-            <Badge className={statusConfig.color}>
+            <Badge className={`${statusConfig.bgColor} ${statusConfig.textColor}`}>
               {statusConfig.label}
             </Badge>
             <Badge variant="outline" className="text-xs">
@@ -133,8 +123,9 @@ function ReviewTaskCard({ task, onReview }) {
 
 // Reviewed Task Card Component
 function ReviewedTaskCard({ task }) {
-  const statusConfig = STATUS_CONFIG[task.status] || STATUS_CONFIG.pending;
-  const isApproved = ['approved_by_tester', 'final_approved', 'approved'].includes(task.status);
+  const statusConfig = getStatusConfig(task.status);
+  // Approved statuses: tester approved (ready for marketer) or fully approved
+  const isApproved = ['approved_by_tester', 'final_approved', 'design_approved', 'development_approved', 'content_final_approved'].includes(task.status);
   const taskType = TASK_TYPE_LABELS[task.taskType] || task.taskType?.replace(/_/g, ' ') || 'Task';
 
   return (
@@ -142,7 +133,7 @@ function ReviewedTaskCard({ task }) {
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-2">
-            <Badge className={statusConfig.color}>
+            <Badge className={`${statusConfig.bgColor} ${statusConfig.textColor}`}>
               {statusConfig.label}
             </Badge>
             <Badge variant="outline" className="text-xs">
@@ -186,160 +177,14 @@ function ReviewedTaskCard({ task }) {
   );
 }
 
-// Dummy data for showcase
-const DUMMY_PENDING_REVIEW = [
-  {
-    _id: 'review-1',
-    taskTitle: 'Homepage Banner Design',
-    taskType: 'graphic_design',
-    creativeName: 'Hero Banner - Summer Sale',
-    status: 'design_submitted',
-    projectId: { _id: 'proj-1', projectName: 'TechCorp Landing Page', businessName: 'TechCorp' },
-    updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'review-2',
-    taskTitle: 'Product Video Edit',
-    taskType: 'video_editing',
-    creativeName: 'Product Demo Video',
-    status: 'submitted',
-    projectId: { _id: 'proj-1', projectName: 'TechCorp Landing Page', businessName: 'TechCorp' },
-    updatedAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'review-3',
-    taskTitle: 'Blog Content Writing',
-    taskType: 'content_writing',
-    creativeName: '10 Tips for Better UX',
-    status: 'content_submitted',
-    projectId: { _id: 'proj-2', projectName: 'Fitness Pro Website', businessName: 'Fitness Pro' },
-    updatedAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'review-4',
-    taskTitle: 'Landing Page Code Review',
-    taskType: 'landing_page_development',
-    creativeName: 'Homepage Implementation',
-    status: 'development_submitted',
-    projectId: { _id: 'proj-2', projectName: 'Fitness Pro Website', businessName: 'Fitness Pro' },
-    updatedAt: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'review-5',
-    taskTitle: 'Social Media Graphics',
-    taskType: 'graphic_design',
-    creativeName: 'Instagram Story Templates',
-    status: 'design_submitted',
-    projectId: { _id: 'proj-3', projectName: 'E-commerce Store', businessName: 'ShopNow' },
-    updatedAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'review-6',
-    taskTitle: 'Email Newsletter Design',
-    taskType: 'graphic_design',
-    creativeName: 'Weekly Newsletter Template',
-    status: 'design_submitted',
-    projectId: { _id: 'proj-3', projectName: 'E-commerce Store', businessName: 'ShopNow' },
-    updatedAt: new Date(Date.now() - 18 * 60 * 60 * 1000).toISOString(),
-  },
-];
-
-const DUMMY_RECENTLY_REVIEWED = [
-  {
-    _id: 'reviewed-1',
-    taskTitle: 'Logo Design',
-    taskType: 'graphic_design',
-    creativeName: 'Company Logo Variations',
-    status: 'approved_by_tester',
-    projectId: { _id: 'proj-1', projectName: 'TechCorp Landing Page', businessName: 'TechCorp' },
-    updatedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'reviewed-2',
-    taskTitle: 'Hero Image Design',
-    taskType: 'graphic_design',
-    creativeName: 'Hero Section Images',
-    status: 'approved_by_tester',
-    projectId: { _id: 'proj-2', projectName: 'Fitness Pro Website', businessName: 'Fitness Pro' },
-    updatedAt: new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'reviewed-3',
-    taskTitle: 'Banner Design',
-    taskType: 'graphic_design',
-    creativeName: 'Promotional Banner',
-    status: 'rejected',
-    projectId: { _id: 'proj-3', projectName: 'E-commerce Store', businessName: 'ShopNow' },
-    updatedAt: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'reviewed-4',
-    taskTitle: 'Feature Video',
-    taskType: 'video_editing',
-    creativeName: 'Product Feature Showcase',
-    status: 'approved_by_tester',
-    projectId: { _id: 'proj-1', projectName: 'TechCorp Landing Page', businessName: 'TechCorp' },
-    updatedAt: new Date(Date.now() - 60 * 60 * 60 * 1000).toISOString(),
-  },
-];
-
-const DUMMY_MY_TASKS = [
-  {
-    _id: 'my-1',
-    taskTitle: 'Test Landing Page',
-    taskType: 'testing',
-    status: 'pending',
-    projectId: { _id: 'proj-1', projectName: 'TechCorp Landing Page' },
-    updatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'my-2',
-    taskTitle: 'Mobile Responsive Test',
-    taskType: 'testing',
-    status: 'in_progress',
-    projectId: { _id: 'proj-2', projectName: 'Fitness Pro Website' },
-    updatedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-  },
-];
-
-const DUMMY_PROJECTS = [
-  {
-    _id: 'proj-1',
-    projectName: 'TechCorp Landing Page',
-    businessName: 'TechCorp',
-    customerName: 'John Smith',
-    status: 'active',
-    isActive: true,
-    overallProgress: 65,
-  },
-  {
-    _id: 'proj-2',
-    projectName: 'Fitness Pro Website',
-    businessName: 'Fitness Pro',
-    customerName: 'Sarah Johnson',
-    status: 'active',
-    isActive: true,
-    overallProgress: 80,
-  },
-  {
-    _id: 'proj-3',
-    projectName: 'E-commerce Store',
-    businessName: 'ShopNow',
-    customerName: 'Mike Davis',
-    status: 'active',
-    isActive: true,
-    overallProgress: 45,
-  },
-];
-
 export default function TesterDashboard({ user }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [pendingReview, setPendingReview] = useState([]);
   const [recentlyReviewed, setRecentlyReviewed] = useState([]);
   const [myTasks, setMyTasks] = useState([]);
   const [projects, setProjects] = useState([]);
-  const [useDummyData, setUseDummyData] = useState(false);
   const [stats, setStats] = useState({
     totalPending: 0,
     totalReviewed: 0,
@@ -355,6 +200,7 @@ export default function TesterDashboard({ user }) {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      setError(null);
 
       // Fetch pending review tasks, my tasks, and projects in parallel
       const [pendingRes, myTasksRes, projectsRes] = await Promise.all([
@@ -367,50 +213,38 @@ export default function TesterDashboard({ user }) {
       const assignedTasks = myTasksRes.data || [];
       const allProjects = projectsRes.data || [];
 
-      // Check if we have real data, if not use dummy data
-      if (pendingTasks.length === 0) {
-        setUseDummyData(true);
-        setPendingReview(DUMMY_PENDING_REVIEW);
-        setRecentlyReviewed(DUMMY_RECENTLY_REVIEWED);
-        setMyTasks(DUMMY_MY_TASKS);
-        setProjects(DUMMY_PROJECTS);
-        calculateStats(DUMMY_PENDING_REVIEW, DUMMY_RECENTLY_REVIEWED, DUMMY_MY_TASKS);
-      } else {
-        setPendingReview(pendingTasks);
-        setMyTasks(assignedTasks);
-        setProjects(allProjects);
+      setPendingReview(pendingTasks);
+      setMyTasks(assignedTasks);
+      setProjects(allProjects);
 
-        const reviewed = pendingTasks.filter(t =>
-          ['approved_by_tester', 'approved', 'rejected'].includes(t.status)
-        ).slice(0, 5);
-        setRecentlyReviewed(reviewed);
-        calculateStats(pendingTasks, reviewed, assignedTasks);
-      }
-    } catch (error) {
-      console.error('Failed to load dashboard data:', error);
-      // Use dummy data on error
-      setUseDummyData(true);
-      setPendingReview(DUMMY_PENDING_REVIEW);
-      setRecentlyReviewed(DUMMY_RECENTLY_REVIEWED);
-      setMyTasks(DUMMY_MY_TASKS);
-      setProjects(DUMMY_PROJECTS);
-      calculateStats(DUMMY_PENDING_REVIEW, DUMMY_RECENTLY_REVIEWED, DUMMY_MY_TASKS);
+      // Tasks that have been reviewed by tester (approved or rejected)
+      const reviewed = pendingTasks.filter(t =>
+        ['approved_by_tester', 'content_final_approved', 'design_approved', 'development_approved', 'rejected'].includes(t.status)
+      ).slice(0, 5);
+      setRecentlyReviewed(reviewed);
+      calculateStats(pendingTasks, reviewed, assignedTasks);
+    } catch (err) {
+      console.error('Failed to load dashboard data:', err);
+      setError(err.message || 'Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
   };
 
   const calculateStats = (pending, reviewed, assigned) => {
+    // Tasks waiting for tester review
     const totalPending = pending.filter(t =>
       ['submitted', 'design_submitted', 'content_submitted', 'development_submitted'].includes(t.status)
     ).length;
 
+    // Tasks approved by tester (any approved status)
     const approvedCount = reviewed.filter(t =>
-      ['approved_by_tester', 'approved'].includes(t.status)
+      ['approved_by_tester', 'content_final_approved', 'design_approved', 'development_approved'].includes(t.status)
     ).length;
 
+    // Tasks rejected
     const rejectedCount = reviewed.filter(t =>
-      t.status === 'rejected'
+      ['rejected', 'content_rejected', 'design_rejected'].includes(t.status)
     ).length;
 
     setStats({
@@ -429,9 +263,9 @@ export default function TesterDashboard({ user }) {
     const rejected = stats.rejectedCount;
 
     const data = [
-      { name: 'Pending Review', value: pending, color: '#F59E0B' },
-      { name: 'Approved', value: approved, color: '#10B981' },
-      { name: 'Rejected', value: rejected, color: '#EF4444' },
+      { name: 'Pending Review', value: pending, color: CHART_COLORS.pending },
+      { name: 'Approved', value: approved, color: CHART_COLORS.approved },
+      { name: 'Rejected', value: rejected, color: CHART_COLORS.rejected },
     ];
     return data.filter(item => item.value > 0);
   };
@@ -481,6 +315,24 @@ export default function TesterDashboard({ user }) {
     return (
       <div className="flex items-center justify-center h-64">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6 animate-fadeIn">
+        <EmptyState
+          icon={AlertCircle}
+          title="Failed to Load Dashboard"
+          description={error}
+          action={
+            <Button onClick={fetchDashboardData}>
+              <RefreshCw size={16} className="mr-2" />
+              Try Again
+            </Button>
+          }
+        />
       </div>
     );
   }
@@ -688,8 +540,7 @@ export default function TesterDashboard({ user }) {
                   />
                   <Bar dataKey="count" radius={[0, 6, 6, 0]}>
                     {tasksByTypeData.map((entry, index) => {
-                      const colors = ['#F59E0B', '#3B82F6', '#10B981', '#8B5CF6', '#EC4899', '#06B6D4'];
-                      return <Cell key={`bar-${index}`} fill={colors[index % colors.length]} />;
+                      return <Cell key={`bar-${index}`} fill={CHART_PALETTE[index % CHART_PALETTE.length]} />;
                     })}
                   </Bar>
                 </BarChart>

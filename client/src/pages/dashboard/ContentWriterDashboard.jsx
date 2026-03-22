@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { projectService, taskService } from '@/services/api';
-import { Card, CardBody, Badge, Spinner, Button } from '@/components/ui';
+import { Card, CardBody, Badge, Spinner, Button, EmptyState } from '@/components/ui';
 import {
   FileText,
   FolderKanban,
@@ -20,6 +20,7 @@ import {
   AlertCircle,
   PenTool,
   Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 import { cn, formatDate } from '@/lib/utils';
 import {
@@ -34,174 +35,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-
-// Status configuration for content writer workflow
-const STATUS_CONFIG = {
-  content_pending: { label: 'Pending', color: 'bg-yellow-100 text-yellow-700', chartColor: '#F59E0B' },
-  content_submitted: { label: 'Submitted', color: 'bg-blue-100 text-blue-700', chartColor: '#3B82F6' },
-  content_final_approved: { label: 'Approved', color: 'bg-green-100 text-green-700', chartColor: '#10B981' },
-  content_rejected: { label: 'Rejected', color: 'bg-red-100 text-red-700', chartColor: '#EF4444' },
-  pending: { label: 'Pending', color: 'bg-yellow-100 text-yellow-700', chartColor: '#F59E0B' },
-  submitted: { label: 'Submitted', color: 'bg-blue-100 text-blue-700', chartColor: '#3B82F6' },
-  approved: { label: 'Approved', color: 'bg-green-100 text-green-700', chartColor: '#10B981' },
-  approved_by_tester: { label: 'Tester Approved', color: 'bg-purple-100 text-purple-700', chartColor: '#8B5CF6' },
-  final_approved: { label: 'Final Approved', color: 'bg-emerald-100 text-emerald-700', chartColor: '#059669' },
-  rejected: { label: 'Rejected', color: 'bg-red-100 text-red-700', chartColor: '#EF4444' },
-  in_progress: { label: 'In Progress', color: 'bg-purple-100 text-purple-700', chartColor: '#8B5CF6' },
-  todo: { label: 'To Do', color: 'bg-gray-100 text-gray-700', chartColor: '#6B7280' },
-};
-
-// Dummy data for showcase
-const DUMMY_TASKS = [
-  {
-    _id: 'cw-1',
-    taskTitle: 'Blog Post - Product Benefits',
-    taskType: 'content_creation',
-    creativeName: '10 Ways Our Product Changes Lives',
-    creativeType: 'BLOG',
-    status: 'content_pending', // Pending
-    projectId: { _id: 'proj-1', projectName: 'TechCorp Landing Page', businessName: 'TechCorp' },
-    contentOutput: { headline: 'Discover the Power', bodyText: 'Full blog content...' },
-    updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'cw-2',
-    taskTitle: 'Ad Copy - Facebook Campaign',
-    taskType: 'content_creation',
-    creativeName: 'FB Ad Copy - Summer Sale',
-    creativeType: 'AD_COPY',
-    status: 'content_submitted', // In Progress
-    projectId: { _id: 'proj-1', projectName: 'TechCorp Landing Page', businessName: 'TechCorp' },
-    contentOutput: { headline: '50% Off Today!', bodyText: 'Limited time offer...' },
-    updatedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'cw-3',
-    taskTitle: 'Email Newsletter Content',
-    taskType: 'content_writing',
-    creativeName: 'Weekly Newsletter - Issue #45',
-    creativeType: 'EMAIL',
-    status: 'content_final_approved', // Completed
-    projectId: { _id: 'proj-2', projectName: 'Fitness Pro Website', businessName: 'Fitness Pro' },
-    contentOutput: { headline: 'Your Weekly Fitness Tips', bodyText: 'Newsletter content...' },
-    updatedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'cw-4',
-    taskTitle: 'Landing Page Headlines',
-    taskType: 'content_creation',
-    creativeName: 'Hero Section Headlines',
-    creativeType: 'HEADLINE',
-    status: 'pending', // Pending
-    projectId: { _id: 'proj-2', projectName: 'Fitness Pro Website', businessName: 'Fitness Pro' },
-    updatedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'cw-5',
-    taskTitle: 'Product Description Copy',
-    taskType: 'content_writing',
-    creativeName: 'Product Features Description',
-    creativeType: 'DESCRIPTION',
-    status: 'in_progress', // In Progress
-    projectId: { _id: 'proj-3', projectName: 'E-commerce Store', businessName: 'ShopNow' },
-    contentOutput: { headline: 'Premium Quality', bodyText: 'Product details...' },
-    updatedAt: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'cw-6',
-    taskTitle: 'Video Script - Explainer',
-    taskType: 'content_creation',
-    creativeName: '60-Second Explainer Script',
-    creativeType: 'SCRIPT',
-    status: 'content_final_approved', // Completed
-    projectId: { _id: 'proj-3', projectName: 'E-commerce Store', businessName: 'ShopNow' },
-    contentOutput: { script: 'Video script content...' },
-    updatedAt: new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'cw-7',
-    taskTitle: 'Instagram Captions',
-    taskType: 'content_creation',
-    creativeName: 'IG Post Captions - Product Launch',
-    creativeType: 'SOCIAL',
-    status: 'submitted', // In Progress
-    projectId: { _id: 'proj-1', projectName: 'TechCorp Landing Page', businessName: 'TechCorp' },
-    updatedAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'cw-8',
-    taskTitle: 'Case Study Content',
-    taskType: 'content_writing',
-    creativeName: 'Customer Success Story',
-    creativeType: 'CASE_STUDY',
-    status: 'approved', // Completed
-    projectId: { _id: 'proj-4', projectName: 'Mobile App Launch', businessName: 'AppStart' },
-    updatedAt: new Date(Date.now() - 96 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'cw-9',
-    taskTitle: 'Product Launch Email',
-    taskType: 'content_creation',
-    creativeName: 'New Feature Announcement',
-    creativeType: 'EMAIL',
-    status: 'content_pending', // Pending
-    projectId: { _id: 'proj-2', projectName: 'Fitness Pro Website', businessName: 'Fitness Pro' },
-    updatedAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'cw-10',
-    taskTitle: 'Website Copy',
-    taskType: 'content_writing',
-    creativeName: 'About Us Page Content',
-    creativeType: 'DESCRIPTION',
-    status: 'final_approved', // Completed
-    projectId: { _id: 'proj-4', projectName: 'Mobile App Launch', businessName: 'AppStart' },
-    updatedAt: new Date(Date.now() - 120 * 60 * 60 * 1000).toISOString(),
-  },
-];
-
-const DUMMY_PROJECTS = [
-  {
-    _id: 'proj-1',
-    projectName: 'TechCorp Landing Page',
-    businessName: 'TechCorp',
-    customerName: 'John Smith',
-    status: 'active',
-    isActive: true,
-    overallProgress: 65,
-    industry: 'Technology',
-  },
-  {
-    _id: 'proj-2',
-    projectName: 'Fitness Pro Website',
-    businessName: 'Fitness Pro',
-    customerName: 'Sarah Johnson',
-    status: 'active',
-    isActive: true,
-    overallProgress: 80,
-    industry: 'Health & Fitness',
-  },
-  {
-    _id: 'proj-3',
-    projectName: 'E-commerce Store',
-    businessName: 'ShopNow',
-    customerName: 'Mike Davis',
-    status: 'active',
-    isActive: true,
-    overallProgress: 45,
-    industry: 'E-commerce',
-  },
-  {
-    _id: 'proj-4',
-    projectName: 'Mobile App Launch',
-    businessName: 'AppStart',
-    customerName: 'Emily Chen',
-    status: 'active',
-    isActive: true,
-    overallProgress: 90,
-    industry: 'Technology',
-  },
-];
+import { STATUS_CONFIG, getStatusConfig, CHART_COLORS } from '@/constants/taskStatuses';
 
 // Stat Card Component (matching Admin dashboard style)
 function StatCard({ title, value, change, changeType, icon: Icon, iconBg }) {
@@ -236,7 +70,7 @@ function StatCard({ title, value, change, changeType, icon: Icon, iconBg }) {
 
 // Task Card Component with hover effects
 function TaskCard({ task, onClick }) {
-  const statusConfig = STATUS_CONFIG[task.status] || STATUS_CONFIG.todo;
+  const statusConfig = getStatusConfig(task.status);
   const creativeTypeLabels = {
     BLOG: 'Blog Post',
     AD_COPY: 'Ad Copy',
@@ -256,7 +90,7 @@ function TaskCard({ task, onClick }) {
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <Badge className={statusConfig.color}>
+            <Badge className={`${statusConfig.bgColor} ${statusConfig.textColor}`}>
               {statusConfig.label}
             </Badge>
             {task.creativeType && (
@@ -301,7 +135,7 @@ export default function ContentWriterDashboard({ user }) {
   const [loading, setLoading] = useState(true);
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
-  const [useDummyData, setUseDummyData] = useState(false);
+  const [error, setError] = useState(null);
   const [stats, setStats] = useState({
     totalTasks: 0,
     pendingContent: 0,
@@ -317,6 +151,7 @@ export default function ContentWriterDashboard({ user }) {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      setError(null);
 
       // Fetch tasks and projects in parallel
       const [tasksRes, projectsRes] = await Promise.all([
@@ -327,44 +162,34 @@ export default function ContentWriterDashboard({ user }) {
       const assignedTasks = tasksRes.data || [];
       const assignedProjects = projectsRes.data || [];
 
-      // Check if we have real data, if not use dummy data
-      if (assignedTasks.length === 0 && assignedProjects.length === 0) {
-        setUseDummyData(true);
-        setTasks(DUMMY_TASKS);
-        setProjects(DUMMY_PROJECTS);
-        calculateStats(DUMMY_TASKS);
-      } else {
-        setTasks(assignedTasks);
-        setProjects(assignedProjects);
-        calculateStats(assignedTasks);
-      }
-    } catch (error) {
-      console.error('Failed to load dashboard data:', error);
-      // Use dummy data on error
-      setUseDummyData(true);
-      setTasks(DUMMY_TASKS);
-      setProjects(DUMMY_PROJECTS);
-      calculateStats(DUMMY_TASKS);
+      setTasks(assignedTasks);
+      setProjects(assignedProjects);
+      calculateStats(assignedTasks);
+    } catch (err) {
+      console.error('Failed to load dashboard data:', err);
+      setError(err.message || 'Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
   };
 
   const calculateStats = (taskList) => {
+    // Content writer sees tasks in content workflow statuses
     const pendingContent = taskList.filter(t =>
-      ['content_pending', 'pending', 'todo'].includes(t.status)
+      ['content_pending', 'content_rejected'].includes(t.status)
     ).length;
 
     const inProgressContent = taskList.filter(t =>
-      ['content_submitted', 'submitted', 'in_progress'].includes(t.status)
+      ['content_submitted'].includes(t.status)
     ).length;
 
+    // Completed = content_final_approved (ready for design) or final_approved (fully done)
     const completedContent = taskList.filter(t =>
-      ['content_final_approved', 'approved', 'approved_by_tester', 'final_approved'].includes(t.status)
+      ['content_final_approved', 'final_approved'].includes(t.status)
     ).length;
 
     const rejectedContent = taskList.filter(t =>
-      ['content_rejected', 'rejected'].includes(t.status)
+      ['content_rejected'].includes(t.status)
     ).length;
 
     setStats({
@@ -379,9 +204,9 @@ export default function ContentWriterDashboard({ user }) {
   // Prepare pie chart data for content status (In Progress, Completed, Pending)
   const getTaskStatusData = () => {
     const data = [
-      { name: 'Pending', value: stats.pendingContent, color: '#F59E0B' },
-      { name: 'In Progress', value: stats.inProgressContent, color: '#3B82F6' },
-      { name: 'Completed', value: stats.completedContent, color: '#10B981' },
+      { name: 'Pending', value: stats.pendingContent, color: CHART_COLORS.pending },
+      { name: 'In Progress', value: stats.inProgressContent, color: CHART_COLORS.inProgress },
+      { name: 'Completed', value: stats.completedContent, color: CHART_COLORS.approved },
     ];
     return data.filter(item => item.value > 0);
   };
@@ -406,7 +231,7 @@ export default function ContentWriterDashboard({ user }) {
 
       projectTaskCount[projectId].total++;
 
-      if (['content_final_approved', 'approved', 'approved_by_tester', 'final_approved'].includes(task.status)) {
+      if (['content_final_approved', 'final_approved'].includes(task.status)) {
         projectTaskCount[projectId].completed++;
       }
     });
@@ -433,7 +258,7 @@ export default function ContentWriterDashboard({ user }) {
   // Get tasks needing attention (rejected or pending)
   const getTasksNeedingAttention = () => {
     return tasks.filter(t =>
-      ['content_rejected', 'rejected', 'content_pending', 'pending'].includes(t.status)
+      ['content_rejected', 'content_pending'].includes(t.status)
     ).slice(0, 3);
   };
 
@@ -441,6 +266,58 @@ export default function ContentWriterDashboard({ user }) {
     return (
       <div className="flex items-center justify-center h-64">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <EmptyState
+          icon={AlertCircle}
+          title="Failed to load dashboard"
+          description={error}
+          action={
+            <Button onClick={fetchDashboardData}>
+              <RefreshCw size={16} className="mr-2" />
+              Try Again
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
+  // Show empty state when no tasks are assigned
+  if (tasks.length === 0) {
+    return (
+      <div className="space-y-6">
+        {/* Welcome Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600">
+              <FileText size={24} className="text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Content Writer Dashboard</h1>
+              <p className="text-gray-500 mt-1">
+                Welcome back, {user?.name?.split(' ')[0] || 'Writer'}!
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <EmptyState
+          icon={FileText}
+          title="No content tasks assigned"
+          description="You don't have any content writing tasks assigned yet. Tasks will appear here once they're assigned to you."
+          action={
+            <Button onClick={() => navigate('/projects')}>
+              <FolderKanban size={16} className="mr-2" />
+              View Projects
+            </Button>
+          }
+        />
       </div>
     );
   }
@@ -682,25 +559,28 @@ export default function ContentWriterDashboard({ user }) {
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {needsAttention.map((task) => (
-              <div
-                key={task._id}
-                onClick={() => navigate(`/tasks/${task._id}`)}
-                className="bg-white rounded-lg p-3 cursor-pointer hover:shadow-md transition-shadow"
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <Badge className={STATUS_CONFIG[task.status]?.color || 'bg-gray-100 text-gray-700'}>
-                    {STATUS_CONFIG[task.status]?.label || task.status}
-                  </Badge>
+            {needsAttention.map((task) => {
+              const taskStatus = getStatusConfig(task.status);
+              return (
+                <div
+                  key={task._id}
+                  onClick={() => navigate(`/tasks/${task._id}`)}
+                  className="bg-white rounded-lg p-3 cursor-pointer hover:shadow-md transition-shadow"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <Badge className={`${taskStatus.bgColor} ${taskStatus.textColor}`}>
+                      {taskStatus.label}
+                    </Badge>
+                  </div>
+                  <p className="font-medium text-gray-900 text-sm truncate">
+                    {task.creativeName || task.taskTitle}
+                  </p>
+                  <p className="text-xs text-gray-500 truncate">
+                    {task.projectId?.projectName || task.projectId?.businessName}
+                  </p>
                 </div>
-                <p className="font-medium text-gray-900 text-sm truncate">
-                  {task.creativeName || task.taskTitle}
-                </p>
-                <p className="text-xs text-gray-500 truncate">
-                  {task.projectId?.projectName || task.projectId?.businessName}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

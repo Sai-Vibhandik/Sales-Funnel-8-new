@@ -51,6 +51,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
+import { PROJECT_STATUS_CONFIG, getProjectStatusConfig } from '@/constants/taskStatuses';
 
 // Modal Portal Component
 function ModalPortal({ children }) {
@@ -201,12 +202,7 @@ function TeamMemberCard({ member, onClick }) {
 
 // Project Card Component
 function ProjectCard({ project, onClick }) {
-  const statusColors = {
-    active: 'bg-green-100 text-green-700',
-    paused: 'bg-yellow-100 text-yellow-700',
-    completed: 'bg-blue-100 text-blue-700',
-    archived: 'bg-gray-100 text-gray-600',
-  };
+  const statusConfig = getProjectStatusConfig(project.status);
   return (
     <div onClick={onClick} className="project-card-enhanced">
       <div className="flex items-start justify-between mb-3">
@@ -220,8 +216,8 @@ function ProjectCard({ project, onClick }) {
           ) : (
             <Badge className="bg-gray-100 text-gray-600">Inactive</Badge>
           )}
-          <Badge className={cn('text-xs', statusColors[project.status])}>
-            {project.status}
+          <Badge className={cn('text-xs', statusConfig.bgColor, statusConfig.textColor)}>
+            {statusConfig.label}
           </Badge>
         </div>
       </div>
@@ -253,18 +249,7 @@ function ProjectCard({ project, onClick }) {
 
 // Project Row Component for List View
 function ProjectRow({ project, onClick }) {
-  const statusColors = {
-    active: 'bg-green-100 text-green-700',
-    paused: 'bg-yellow-100 text-yellow-700',
-    completed: 'bg-blue-100 text-blue-700',
-    archived: 'bg-gray-100 text-gray-600',
-  };
-  const statusLabels = {
-    active: 'Active',
-    paused: 'Paused',
-    completed: 'Completed',
-    archived: 'Archived',
-  };
+  const statusConfig = getProjectStatusConfig(project.status);
   return (
     <div
       onClick={onClick}
@@ -285,8 +270,8 @@ function ProjectRow({ project, onClick }) {
         <span className="text-sm text-gray-600">{project.industry || '-'}</span>
       </div>
       <div className="flex items-center gap-2">
-        <Badge className={cn('text-xs', statusColors[project.status])}>
-          {statusLabels[project.status] || project.status}
+        <Badge className={cn('text-xs', statusConfig.bgColor, statusConfig.textColor)}>
+          {statusConfig.label}
         </Badge>
       </div>
       <div className="hidden lg:flex items-center gap-3 w-40">
@@ -555,17 +540,21 @@ export default function AdminDashboardPage() {
     fetchData();
   };
 
-  // Pie chart: In Progress, Completed, Paused
+  // Pie chart: Active (In Progress), Completed, Paused, Archived
   const getTaskStatusData = () => {
-    const inProgress = stats.activeProjects || 0;
-    const completed  = stats.completedProjects || 0;
-    // Use pausedProjects if API returns it, otherwise derive from remainder
-    const paused     = stats.pausedProjects ?? Math.max(0, stats.totalProjects - inProgress - completed);
-    return [
-      { name: 'In progress', value: inProgress, color: '#378ADD' },
-      { name: 'Completed',   value: completed,  color: '#1D9E75' },
-      { name: 'Paused',      value: paused,     color: '#EF9F27' },
-    ].filter(item => item.value > 0);
+    const active = stats.activeProjects || 0;
+    const completed = stats.completedProjects || 0;
+    const paused = stats.pausedProjects || 0;
+    const archived = stats.archivedProjects || 0;
+
+    const data = [
+      { name: 'Active', value: active, color: '#378ADD' },
+      { name: 'Completed', value: completed, color: '#1D9E75' },
+      { name: 'Paused', value: paused, color: '#EF9F27' },
+      { name: 'Archived', value: archived, color: '#6B7280' },
+    ];
+
+    return data.filter(item => item.value > 0);
   };
 
   // Bar chart: each role gets its own color

@@ -8,32 +8,7 @@ import {
   Upload, Send, Eye, ArrowRight, AlertCircle, Video, Layout, Code, X, FileIcon,
   ArrowLeft
 } from 'lucide-react';
-
-// Task statuses for the production workflow
-const TASK_STATUSES = {
-  // Common statuses
-  todo: { label: 'To Do', color: 'bg-gray-100 text-gray-800', icon: ClipboardList },
-  in_progress: { label: 'In Progress', color: 'bg-blue-100 text-blue-800', icon: Play },
-  submitted: { label: 'Submitted', color: 'bg-yellow-100 text-yellow-800', icon: Send },
-  approved_by_tester: { label: 'Tester Approved', color: 'bg-purple-100 text-purple-800', icon: CheckCircle },
-  final_approved: { label: 'Completed', color: 'bg-green-100 text-green-800', icon: CheckCircle },
-  rejected: { label: 'Rejected', color: 'bg-red-100 text-red-800', icon: XCircle },
-  // Content creation workflow
-  content_pending: { label: 'Content Pending', color: 'bg-orange-100 text-orange-800', icon: FileText },
-  content_submitted: { label: 'Content Review', color: 'bg-yellow-100 text-yellow-800', icon: Send },
-  content_approved: { label: 'Content Approved', color: 'bg-purple-100 text-purple-800', icon: CheckCircle },
-  content_rejected: { label: 'Content Rejected', color: 'bg-red-100 text-red-800', icon: XCircle },
-  content_final_approved: { label: 'Content Final Approved', color: 'bg-green-100 text-green-800', icon: CheckCircle },
-  // Design workflow
-  design_pending: { label: 'Design Pending', color: 'bg-orange-100 text-orange-800', icon: Layout },
-  design_submitted: { label: 'Design Review', color: 'bg-yellow-100 text-yellow-800', icon: Send },
-  design_approved: { label: 'Design Approved', color: 'bg-purple-100 text-purple-800', icon: CheckCircle },
-  design_rejected: { label: 'Design Rejected', color: 'bg-red-100 text-red-800', icon: XCircle },
-  // Landing page development workflow
-  development_pending: { label: 'Dev Pending', color: 'bg-orange-100 text-orange-800', icon: Code },
-  development_submitted: { label: 'Dev Review', color: 'bg-yellow-100 text-yellow-800', icon: Send },
-  development_approved: { label: 'Dev Approved', color: 'bg-purple-100 text-purple-800', icon: CheckCircle }
-};
+import { STATUS_CONFIG, getStatusConfig, TASK_STATUSES } from '@/constants/taskStatuses';
 
 const TASK_TYPES = [
   { id: 'graphic_design', label: 'Graphic Design', icon: Palette },
@@ -225,10 +200,10 @@ export default function TasksPage() {
   };
 
   const getStatusBadge = (status) => {
-    const statusConfig = TASK_STATUSES[status] || TASK_STATUSES.todo;
+    const statusConfig = getStatusConfig(status);
     const Icon = statusConfig.icon;
     return (
-      <span className={`px-2 py-1 text-xs rounded-full flex items-center gap-1 ${statusConfig.color}`}>
+      <span className={`px-2 py-1 text-xs rounded-full flex items-center gap-1 ${statusConfig.bgColor} ${statusConfig.textColor}`}>
         <Icon className="w-3 h-3" />
         {statusConfig.label}
       </span>
@@ -318,8 +293,8 @@ export default function TasksPage() {
                 className="px-3 py-2 border border-gray-300 rounded-lg"
               >
                 <option value="">All Statuses</option>
-                {Object.entries(TASK_STATUSES).map(([key, value]) => (
-                  <option key={key} value={key}>{value.label}</option>
+                {TASK_STATUSES.map((status) => (
+                  <option key={status} value={status}>{STATUS_CONFIG[status]?.label || status}</option>
                 ))}
               </select>
             </div>

@@ -34,20 +34,9 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-
-// Status configuration with colors matching the requirement
-const STATUS_CONFIG = {
-  design_pending: { label: 'Pending', color: 'bg-yellow-100 text-yellow-700', chartColor: '#F59E0B' },
-  design_submitted: { label: 'Submitted', color: 'bg-blue-100 text-blue-700', chartColor: '#3B82F6' },
-  design_approved: { label: 'Approved', color: 'bg-green-100 text-green-700', chartColor: '#10B981' },
-  design_rejected: { label: 'Rejected', color: 'bg-red-100 text-red-700', chartColor: '#EF4444' },
-  pending: { label: 'Pending', color: 'bg-yellow-100 text-yellow-700', chartColor: '#F59E0B' },
-  submitted: { label: 'Submitted', color: 'bg-blue-100 text-blue-700', chartColor: '#3B82F6' },
-  approved: { label: 'Approved', color: 'bg-green-100 text-green-700', chartColor: '#10B981' },
-  rejected: { label: 'Rejected', color: 'bg-red-100 text-red-700', chartColor: '#EF4444' },
-  in_progress: { label: 'In Progress', color: 'bg-purple-100 text-purple-700', chartColor: '#8B5CF6' },
-  todo: { label: 'To Do', color: 'bg-gray-100 text-gray-700', chartColor: '#6B7280' },
-};
+import { STATUS_CONFIG, getStatusConfig, CHART_COLORS } from '@/constants/taskStatuses';
+import { EmptyState } from '@/components/ui';
+import { RefreshCw } from 'lucide-react';
 
 // Stat Card Component (matching Admin dashboard style)
 function StatCard({ title, value, change, changeType, icon: Icon, iconBg }) {
@@ -82,7 +71,7 @@ function StatCard({ title, value, change, changeType, icon: Icon, iconBg }) {
 
 // Task Card Component with hover effects
 function TaskCard({ task, onClick }) {
-  const statusConfig = STATUS_CONFIG[task.status] || STATUS_CONFIG.todo;
+  const statusConfig = getStatusConfig(task.status);
 
   return (
     <div
@@ -92,7 +81,7 @@ function TaskCard({ task, onClick }) {
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <Badge className={statusConfig.color}>
+            <Badge className={`${statusConfig.bgColor} ${statusConfig.textColor}`}>
               {statusConfig.label}
             </Badge>
           </div>
@@ -123,139 +112,12 @@ function TaskCard({ task, onClick }) {
   );
 }
 
-// Dummy data for showcase
-const DUMMY_TASKS = [
-  {
-    _id: 'gd-1',
-    taskTitle: 'Homepage Banner Design',
-    taskType: 'graphic_design',
-    creativeName: 'Hero Banner - Summer Sale',
-    creativeType: 'IMAGE',
-    status: 'design_pending',
-    projectId: { _id: 'proj-1', projectName: 'TechCorp Landing Page', businessName: 'TechCorp' },
-    updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'gd-2',
-    taskTitle: 'Product Showcase Graphics',
-    taskType: 'graphic_design',
-    creativeName: 'Product Feature Images',
-    creativeType: 'IMAGE',
-    status: 'design_submitted',
-    projectId: { _id: 'proj-1', projectName: 'TechCorp Landing Page', businessName: 'TechCorp' },
-    updatedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'gd-3',
-    taskTitle: 'Social Media Graphics',
-    taskType: 'graphic_design',
-    creativeName: 'Instagram Story Templates',
-    creativeType: 'IMAGE',
-    status: 'design_approved',
-    projectId: { _id: 'proj-2', projectName: 'Fitness Pro Website', businessName: 'Fitness Pro' },
-    updatedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'gd-4',
-    taskTitle: 'Email Header Design',
-    taskType: 'graphic_design',
-    creativeName: 'Newsletter Header Image',
-    creativeType: 'IMAGE',
-    status: 'design_pending',
-    projectId: { _id: 'proj-2', projectName: 'Fitness Pro Website', businessName: 'Fitness Pro' },
-    updatedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'gd-5',
-    taskTitle: 'Facebook Ad Creatives',
-    taskType: 'graphic_design',
-    creativeName: 'FB Ad - Winter Collection',
-    creativeType: 'IMAGE',
-    status: 'rejected',
-    projectId: { _id: 'proj-3', projectName: 'E-commerce Store', businessName: 'ShopNow' },
-    updatedAt: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'gd-6',
-    taskTitle: 'Carousel Post Design',
-    taskType: 'graphic_design',
-    creativeName: 'Product Benefits Carousel',
-    creativeType: 'CAROUSEL',
-    status: 'design_approved',
-    projectId: { _id: 'proj-3', projectName: 'E-commerce Store', businessName: 'ShopNow' },
-    updatedAt: new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'gd-7',
-    taskTitle: 'Promotional Banner',
-    taskType: 'graphic_design',
-    creativeName: 'Black Friday Banner',
-    creativeType: 'IMAGE',
-    status: 'design_submitted',
-    projectId: { _id: 'proj-1', projectName: 'TechCorp Landing Page', businessName: 'TechCorp' },
-    updatedAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'gd-8',
-    taskTitle: 'App Store Screenshots',
-    taskType: 'graphic_design',
-    creativeName: 'App Preview Images',
-    creativeType: 'IMAGE',
-    status: 'design_approved',
-    projectId: { _id: 'proj-4', projectName: 'Mobile App Launch', businessName: 'AppStart' },
-    updatedAt: new Date(Date.now() - 96 * 60 * 60 * 1000).toISOString(),
-  },
-];
-
-const DUMMY_PROJECTS = [
-  {
-    _id: 'proj-1',
-    projectName: 'TechCorp Landing Page',
-    businessName: 'TechCorp',
-    customerName: 'John Smith',
-    status: 'active',
-    isActive: true,
-    overallProgress: 65,
-    industry: 'Technology',
-  },
-  {
-    _id: 'proj-2',
-    projectName: 'Fitness Pro Website',
-    businessName: 'Fitness Pro',
-    customerName: 'Sarah Johnson',
-    status: 'active',
-    isActive: true,
-    overallProgress: 80,
-    industry: 'Health & Fitness',
-  },
-  {
-    _id: 'proj-3',
-    projectName: 'E-commerce Store',
-    businessName: 'ShopNow',
-    customerName: 'Mike Davis',
-    status: 'active',
-    isActive: true,
-    overallProgress: 45,
-    industry: 'E-commerce',
-  },
-  {
-    _id: 'proj-4',
-    projectName: 'Mobile App Launch',
-    businessName: 'AppStart',
-    customerName: 'Emily Chen',
-    status: 'active',
-    isActive: true,
-    overallProgress: 90,
-    industry: 'Technology',
-  },
-];
-
 export default function GraphicDesignerDashboard({ user }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
-  const [useDummyData, setUseDummyData] = useState(false);
   const [stats, setStats] = useState({
     totalTasks: 0,
     pendingDesigns: 0,
@@ -271,6 +133,7 @@ export default function GraphicDesignerDashboard({ user }) {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      setError(null);
 
       // Fetch tasks and projects in parallel
       const [tasksRes, projectsRes] = await Promise.all([
@@ -281,42 +144,34 @@ export default function GraphicDesignerDashboard({ user }) {
       const assignedTasks = tasksRes.data || [];
       const assignedProjects = projectsRes.data || [];
 
-      // Check if we have real data, if not use dummy data
-      if (assignedTasks.length === 0 && assignedProjects.length === 0) {
-        setUseDummyData(true);
-        setTasks(DUMMY_TASKS);
-        setProjects(DUMMY_PROJECTS);
-        calculateStats(DUMMY_TASKS);
-      } else {
-        setTasks(assignedTasks);
-        setProjects(assignedProjects);
-        calculateStats(assignedTasks);
-      }
-    } catch (error) {
-      console.error('Failed to load dashboard data:', error);
-      // Use dummy data on error
-      setUseDummyData(true);
-      setTasks(DUMMY_TASKS);
-      setProjects(DUMMY_PROJECTS);
-      calculateStats(DUMMY_TASKS);
+      setTasks(assignedTasks);
+      setProjects(assignedProjects);
+      calculateStats(assignedTasks);
+    } catch (err) {
+      console.error('Failed to load dashboard data:', err);
+      setError(err.message || 'Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
   };
 
   const calculateStats = (taskList) => {
+    // Tasks waiting for designer to start
     const pendingDesigns = taskList.filter(t =>
-      ['design_pending', 'pending', 'todo'].includes(t.status)
+      ['design_pending', 'todo', 'in_progress'].includes(t.status)
     ).length;
 
+    // Tasks submitted for review
     const submittedDesigns = taskList.filter(t =>
-      ['design_submitted', 'submitted', 'in_progress'].includes(t.status)
+      ['design_submitted'].includes(t.status)
     ).length;
 
+    // Tasks approved (by tester or marketer)
     const approvedDesigns = taskList.filter(t =>
-      ['design_approved', 'approved', 'approved_by_tester', 'final_approved'].includes(t.status)
+      ['design_approved', 'final_approved'].includes(t.status)
     ).length;
 
+    // Tasks rejected
     const rejectedDesigns = taskList.filter(t =>
       ['design_rejected', 'rejected'].includes(t.status)
     ).length;
@@ -333,10 +188,10 @@ export default function GraphicDesignerDashboard({ user }) {
   // Prepare pie chart data for task status distribution
   const getTaskStatusData = () => {
     const data = [
-      { name: 'Pending', value: stats.pendingDesigns, color: '#F59E0B' },
-      { name: 'Submitted', value: stats.submittedDesigns, color: '#3B82F6' },
-      { name: 'Approved', value: stats.approvedDesigns, color: '#10B981' },
-      { name: 'Rejected', value: stats.rejectedDesigns, color: '#EF4444' },
+      { name: 'Pending', value: stats.pendingDesigns, color: CHART_COLORS.pending },
+      { name: 'Submitted', value: stats.submittedDesigns, color: CHART_COLORS.submitted },
+      { name: 'Approved', value: stats.approvedDesigns, color: CHART_COLORS.approved },
+      { name: 'Rejected', value: stats.rejectedDesigns, color: CHART_COLORS.rejected },
     ];
     return data.filter(item => item.value > 0);
   };
@@ -361,7 +216,7 @@ export default function GraphicDesignerDashboard({ user }) {
 
       projectTaskCount[projectId].total++;
 
-      if (['design_approved', 'approved', 'approved_by_tester', 'final_approved'].includes(task.status)) {
+      if (['design_approved', 'final_approved'].includes(task.status)) {
         projectTaskCount[projectId].completed++;
       }
     });
@@ -389,6 +244,24 @@ export default function GraphicDesignerDashboard({ user }) {
     return (
       <div className="flex items-center justify-center h-64">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6 animate-fadeIn">
+        <EmptyState
+          icon={AlertCircle}
+          title="Failed to Load Dashboard"
+          description={error}
+          action={
+            <Button onClick={fetchDashboardData}>
+              <RefreshCw size={16} className="mr-2" />
+              Try Again
+            </Button>
+          }
+        />
       </div>
     );
   }

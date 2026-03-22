@@ -1,5 +1,18 @@
 const mongoose = require('mongoose');
 
+// Import centralized status constants
+const {
+  TASK_STATUSES,
+  PENDING_STATUSES,
+  SUBMITTED_STATUSES,
+  APPROVED_STATUSES,
+  getInitialStatus,
+  canSubmit,
+  canBeReviewedByTester,
+  canBeApprovedByMarketer,
+  getValidTransitions
+} = require('../constants/taskStatuses');
+
 // Task types for different production workflows
 const TASK_TYPES = [
   'content_creation',
@@ -7,37 +20,6 @@ const TASK_TYPES = [
   'video_editing',
   'landing_page_design',
   'landing_page_development'
-];
-
-// Task statuses for production workflow
-const TASK_STATUSES = [
-  // Common statuses
-  'todo',           // Task created, not started
-  'in_progress',    // Assigned user is working on it
-
-  // Content creation workflow
-  'content_pending',        // Awaiting content creator
-  'content_submitted',      // Content submitted for tester review
-  'content_approved',       // LEGACY - Content approved by tester (old flow)
-  'content_rejected',       // Content rejected
-  'content_final_approved', // Content approved by tester, ready for design (NEW FLOW - skip marketer for content)
-
-  // Design workflow
-  'design_pending',         // Awaiting designer
-  'design_submitted',       // Design submitted for tester review
-  'design_approved',        // Design approved by tester, awaiting marketer review
-  'design_rejected',        // Design rejected
-
-  // Final status
-  'final_approved',         // Fully approved by performance marketer
-
-  // Legacy statuses (for backward compatibility)
-  'submitted',              // Work submitted for review
-  'approved_by_tester',     // Tester approved, awaiting marketer review
-  'rejected',               // Rejected with notes
-  'development_pending',     // Landing page: awaiting development
-  'development_submitted',   // Landing page: development submitted for tester review
-  'development_approved'    // Landing page: development approved, awaiting marketer
 ];
 
 // Asset types that can be produced
@@ -364,47 +346,36 @@ taskSchema.statics.getRoleForTaskType = function(taskType) {
 };
 
 // Static method to get initial status for task type
+// Uses centralized getInitialStatus function from constants
 taskSchema.statics.getInitialStatus = function(taskType) {
-  if (taskType === 'content_creation') {
-    return 'content_pending';
-  }
-  if (taskType === 'landing_page_design') {
-    return 'design_pending';
-  }
-  if (taskType === 'landing_page_development') {
-    return 'development_pending';
-  }
-  return 'todo';
+  return getInitialStatus(taskType);
 };
 
 // Method to check if task can be submitted
 taskSchema.methods.canSubmit = function() {
+  // Use PENDING_STATUSES from constants plus rejected statuses
   const submittableStatuses = [
-    'todo', 'in_progress', 'rejected',
-    'content_pending', 'content_rejected',
-    'design_pending', 'design_rejected',
-    'development_pending'
+    ...PENDING_STATUSES,
+    'rejected',
+    'content_rejected',
+    'design_rejected'
   ];
   return submittableStatuses.includes(this.status);
 };
 
 // Method to check if task can be reviewed by tester
 taskSchema.methods.canBeReviewedByTester = function() {
-  const testerReviewableStatuses = [
-    'content_submitted',    // Content creator submitted for tester review
-    'design_submitted',     // Designer submitted for tester review
-    'development_submitted' // Developer submitted for tester review
-  ];
-  return testerReviewableStatuses.includes(this.status);
+  return SUBMITTED_STATUSES.includes(this.status);
 };
 
 // Method to check if task can be approved by marketer
 taskSchema.methods.canBeApprovedByMarketer = function() {
+  // Marketer approves after tester approval - final step before completion
+  // Note: content_final_approved goes directly to design, not marketer
   const marketerApprovableStatuses = [
-    // Note: content_approved is NOT included - content goes directly to design after tester approval
-    // Marketer only approves final design/video, not content
-    'design_approved',     // Design approved by tester, awaiting marketer (for creative tasks)
-    'development_approved'  // Development approved by tester, awaiting marketer (for landing pages)
+    'design_approved',      // Design approved by tester, awaiting marketer (for creative tasks)
+    'development_approved', // Development approved by tester, awaiting marketer (for landing pages)
+    'approved_by_tester'    // Legacy status for backward compatibility
   ];
   return marketerApprovableStatuses.includes(this.status);
 };

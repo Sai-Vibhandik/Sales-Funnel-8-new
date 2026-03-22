@@ -216,6 +216,8 @@ export const taskService = {
   generateTasks: (projectId) => api.post(`/tasks/generate/${projectId}`),
   // Get team members
   getTeamMembers: () => api.get('/tasks/team-members'),
+  // Get task statistics for dashboard (by role)
+  getTaskStats: (role) => api.get(`/tasks/stats/${role}`),
 };
 
 // Strategy service

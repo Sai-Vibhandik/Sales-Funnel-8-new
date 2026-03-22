@@ -38,6 +38,7 @@ import {
   LineChart,
   Line,
 } from 'recharts';
+import { getProjectStatusConfig } from '@/constants/taskStatuses';
 
 // ============================================
 // DESIGN SYSTEM CONSTANTS
@@ -112,21 +113,7 @@ function ProjectCard({ project, getNextStage, getStageProgress, navigate }) {
   const progress = getStageProgress(project);
   const progressPercent = (progress.completed / progress.total) * 100;
 
-  const getStatusBadge = () => {
-    switch (project.status) {
-      case 'completed':
-        return { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Completed', dot: 'bg-emerald-500' };
-      case 'paused':
-        return { bg: 'bg-amber-100', text: 'text-amber-700', label: 'Paused', dot: 'bg-amber-500' };
-      case 'archived':
-        return { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Archived', dot: 'bg-gray-400' };
-      case 'active':
-      default:
-        return { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Active', dot: 'bg-blue-500' };
-    }
-  };
-
-  const status = getStatusBadge();
+  const statusConfig = getProjectStatusConfig(project.status);
 
   return (
     <div
@@ -144,9 +131,8 @@ function ProjectCard({ project, getNextStage, getStageProgress, navigate }) {
             <p className="text-sm text-gray-500">{project.customerName}</p>
           </div>
         </div>
-        <Badge className={cn(status.bg, status.text)}>
-          <span className={cn('w-1.5 h-1.5 rounded-full mr-1.5', status.dot)} />
-          {status.label}
+        <Badge className={cn(statusConfig.bgColor, statusConfig.textColor)}>
+          {statusConfig.label}
         </Badge>
       </div>
 

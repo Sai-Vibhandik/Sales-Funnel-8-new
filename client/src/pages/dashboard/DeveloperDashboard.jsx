@@ -34,21 +34,9 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-
-// Status configuration with colors for developer workflow
-const STATUS_CONFIG = {
-  development_pending: { label: 'Pending', color: 'bg-yellow-100 text-yellow-700', chartColor: '#F59E0B' },
-  development_submitted: { label: 'Submitted', color: 'bg-blue-100 text-blue-700', chartColor: '#3B82F6' },
-  development_approved: { label: 'Approved', color: 'bg-green-100 text-green-700', chartColor: '#10B981' },
-  pending: { label: 'Pending', color: 'bg-yellow-100 text-yellow-700', chartColor: '#F59E0B' },
-  submitted: { label: 'Submitted', color: 'bg-blue-100 text-blue-700', chartColor: '#3B82F6' },
-  approved: { label: 'Approved', color: 'bg-green-100 text-green-700', chartColor: '#10B981' },
-  approved_by_tester: { label: 'Tester Approved', color: 'bg-purple-100 text-purple-700', chartColor: '#8B5CF6' },
-  final_approved: { label: 'Completed', color: 'bg-green-100 text-green-700', chartColor: '#059669' },
-  rejected: { label: 'Rejected', color: 'bg-red-100 text-red-700', chartColor: '#EF4444' },
-  in_progress: { label: 'In Progress', color: 'bg-purple-100 text-purple-700', chartColor: '#8B5CF6' },
-  todo: { label: 'To Do', color: 'bg-gray-100 text-gray-700', chartColor: '#6B7280' },
-};
+import { STATUS_CONFIG, getStatusConfig, CHART_COLORS } from '@/constants/taskStatuses';
+import { EmptyState } from '@/components/ui';
+import { RefreshCw } from 'lucide-react';
 
 // Stat Card Component (matching Admin dashboard style)
 function StatCard({ title, value, change, changeType, icon: Icon, iconBg }) {
@@ -83,7 +71,7 @@ function StatCard({ title, value, change, changeType, icon: Icon, iconBg }) {
 
 // Task Card Component with hover effects
 function TaskCard({ task, onClick }) {
-  const statusConfig = STATUS_CONFIG[task.status] || STATUS_CONFIG.todo;
+  const statusConfig = getStatusConfig(task.status);
 
   return (
     <div
@@ -93,7 +81,7 @@ function TaskCard({ task, onClick }) {
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <Badge className={statusConfig.color}>
+            <Badge className={`${statusConfig.bgColor} ${statusConfig.textColor}`}>
               {statusConfig.label}
             </Badge>
           </div>
@@ -124,97 +112,12 @@ function TaskCard({ task, onClick }) {
   );
 }
 
-// Dummy data for showcase
-const DUMMY_TASKS = [
-  {
-    _id: 'dev-1',
-    taskTitle: 'Landing Page Development - Homepage',
-    taskType: 'landing_page_development',
-    status: 'development_pending',
-    projectId: { _id: 'proj-1', projectName: 'TechCorp Landing Page', businessName: 'TechCorp' },
-    updatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'dev-2',
-    taskTitle: 'Contact Form Integration',
-    taskType: 'landing_page_development',
-    status: 'development_submitted',
-    projectId: { _id: 'proj-1', projectName: 'TechCorp Landing Page', businessName: 'TechCorp' },
-    updatedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'dev-3',
-    taskTitle: 'Responsive Design Implementation',
-    taskType: 'landing_page_development',
-    status: 'development_approved',
-    projectId: { _id: 'proj-2', projectName: 'Fitness Pro Website', businessName: 'Fitness Pro' },
-    updatedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'dev-4',
-    taskTitle: 'Animation & Interactions',
-    taskType: 'landing_page_development',
-    status: 'development_pending',
-    projectId: { _id: 'proj-2', projectName: 'Fitness Pro Website', businessName: 'Fitness Pro' },
-    updatedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'dev-5',
-    taskTitle: 'SEO Meta Tags Setup',
-    taskType: 'landing_page_development',
-    status: 'rejected',
-    projectId: { _id: 'proj-3', projectName: 'E-commerce Store', businessName: 'ShopNow' },
-    updatedAt: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    _id: 'dev-6',
-    taskTitle: 'Performance Optimization',
-    taskType: 'landing_page_development',
-    status: 'development_approved',
-    projectId: { _id: 'proj-3', projectName: 'E-commerce Store', businessName: 'ShopNow' },
-    updatedAt: new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString(),
-  },
-];
-
-const DUMMY_PROJECTS = [
-  {
-    _id: 'proj-1',
-    projectName: 'TechCorp Landing Page',
-    businessName: 'TechCorp',
-    customerName: 'John Smith',
-    status: 'active',
-    isActive: true,
-    overallProgress: 65,
-    industry: 'Technology',
-  },
-  {
-    _id: 'proj-2',
-    projectName: 'Fitness Pro Website',
-    businessName: 'Fitness Pro',
-    customerName: 'Sarah Johnson',
-    status: 'active',
-    isActive: true,
-    overallProgress: 80,
-    industry: 'Health & Fitness',
-  },
-  {
-    _id: 'proj-3',
-    projectName: 'E-commerce Store',
-    businessName: 'ShopNow',
-    customerName: 'Mike Davis',
-    status: 'active',
-    isActive: true,
-    overallProgress: 45,
-    industry: 'E-commerce',
-  },
-];
-
 export default function DeveloperDashboard({ user }) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
-  const [useDummyData, setUseDummyData] = useState(false);
   const [stats, setStats] = useState({
     totalTasks: 0,
     pendingTasks: 0,
@@ -230,6 +133,7 @@ export default function DeveloperDashboard({ user }) {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      setError(null);
 
       // Fetch tasks and projects in parallel
       const [tasksRes, projectsRes] = await Promise.all([
@@ -240,42 +144,34 @@ export default function DeveloperDashboard({ user }) {
       const assignedTasks = tasksRes.data || [];
       const assignedProjects = projectsRes.data || [];
 
-      // Check if we have real data, if not use dummy data
-      if (assignedTasks.length === 0 && assignedProjects.length === 0) {
-        setUseDummyData(true);
-        setTasks(DUMMY_TASKS);
-        setProjects(DUMMY_PROJECTS);
-        calculateStats(DUMMY_TASKS);
-      } else {
-        setTasks(assignedTasks);
-        setProjects(assignedProjects);
-        calculateStats(assignedTasks);
-      }
-    } catch (error) {
-      console.error('Failed to load dashboard data:', error);
-      // Use dummy data on error
-      setUseDummyData(true);
-      setTasks(DUMMY_TASKS);
-      setProjects(DUMMY_PROJECTS);
-      calculateStats(DUMMY_TASKS);
+      setTasks(assignedTasks);
+      setProjects(assignedProjects);
+      calculateStats(assignedTasks);
+    } catch (err) {
+      console.error('Failed to load dashboard data:', err);
+      setError(err.message || 'Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
   };
 
   const calculateStats = (taskList) => {
+    // Tasks waiting for developer to start
     const pendingTasks = taskList.filter(t =>
-      ['development_pending', 'pending', 'todo'].includes(t.status)
+      ['development_pending', 'todo', 'in_progress'].includes(t.status)
     ).length;
 
+    // Tasks submitted for review
     const submittedTasks = taskList.filter(t =>
-      ['development_submitted', 'submitted', 'in_progress'].includes(t.status)
+      ['development_submitted'].includes(t.status)
     ).length;
 
+    // Tasks completed (approved by tester or marketer)
     const completedTasks = taskList.filter(t =>
-      ['development_approved', 'approved', 'approved_by_tester', 'final_approved'].includes(t.status)
+      ['development_approved', 'final_approved'].includes(t.status)
     ).length;
 
+    // Tasks rejected
     const rejectedTasks = taskList.filter(t =>
       ['rejected'].includes(t.status)
     ).length;
@@ -292,10 +188,10 @@ export default function DeveloperDashboard({ user }) {
   // Prepare pie chart data for task status distribution
   const getTaskStatusData = () => {
     const data = [
-      { name: 'Pending', value: stats.pendingTasks, color: '#F59E0B' },
-      { name: 'In Progress', value: stats.submittedTasks, color: '#3B82F6' },
-      { name: 'Completed', value: stats.completedTasks, color: '#10B981' },
-      { name: 'Rejected', value: stats.rejectedTasks, color: '#EF4444' },
+      { name: 'Pending', value: stats.pendingTasks, color: CHART_COLORS.pending },
+      { name: 'In Progress', value: stats.submittedTasks, color: CHART_COLORS.submitted },
+      { name: 'Completed', value: stats.completedTasks, color: CHART_COLORS.approved },
+      { name: 'Rejected', value: stats.rejectedTasks, color: CHART_COLORS.rejected },
     ];
     return data.filter(item => item.value > 0);
   };
@@ -320,7 +216,7 @@ export default function DeveloperDashboard({ user }) {
 
       projectTaskCount[projectId].total++;
 
-      if (['development_approved', 'approved', 'approved_by_tester', 'final_approved'].includes(task.status)) {
+      if (['development_approved', 'final_approved'].includes(task.status)) {
         projectTaskCount[projectId].completed++;
       }
     });
@@ -355,6 +251,24 @@ export default function DeveloperDashboard({ user }) {
     return (
       <div className="flex items-center justify-center h-64">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6 animate-fadeIn">
+        <EmptyState
+          icon={AlertCircle}
+          title="Failed to Load Dashboard"
+          description={error}
+          action={
+            <Button onClick={fetchDashboardData}>
+              <RefreshCw size={16} className="mr-2" />
+              Try Again
+            </Button>
+          }
+        />
       </div>
     );
   }

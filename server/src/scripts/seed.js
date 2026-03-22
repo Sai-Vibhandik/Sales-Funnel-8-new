@@ -127,7 +127,7 @@ const seedProjects = [
       endDate: new Date('2024-04-20')
     },
     isActive: false,
-    status: 'paused'
+    status: 'active'
   }
 ];
 
