@@ -39,13 +39,11 @@ const STAGE_NAMES = {
   creativeStrategy: 'Creative Strategy',
 };
 
-// Team member roles that should see tasks instead of project details
-// Only content_writer, content_creator, and video_editor see tasks;
-// graphic_designer, developer, tester, ui_ux_designer see project details
-const TEAM_MEMBER_ROLES = ['content_writer', 'content_creator', 'video_editor'];
+// All roles now navigate to project details page
+// The project details page handles role-specific views internally
 
 // Project Card Component
-function ProjectCard({ project, onDelete, isAdmin, isTeamMember, navigate }) {
+function ProjectCard({ project, onDelete, isAdmin, navigate }) {
   const stageKeys = ['onboarding', 'marketResearch', 'offerEngineering', 'trafficStrategy', 'landingPage', 'creativeStrategy'];
   const completedStages = stageKeys.filter(key => project.stages?.[key]?.isCompleted).length;
   const progressPercent = (completedStages / stageKeys.length) * 100;
@@ -78,15 +76,10 @@ function ProjectCard({ project, onDelete, isAdmin, isTeamMember, navigate }) {
   const status = getStatusBadge();
   const currentStage = getCurrentStage();
 
-  // Handle click: team members see tasks, admins/PMs see project details
+  // Navigate to project details - all roles see the same project details page
+  // which internally shows role-specific content
   const handleClick = () => {
-    if (isTeamMember) {
-      // Navigate to tasks filtered by project
-      navigate(`/tasks?projectId=${project._id}`);
-    } else {
-      // Navigate to project details
-      navigate(`/projects/${project._id}`);
-    }
+    navigate(`/projects/${project._id}`);
   };
 
   return (
@@ -283,7 +276,6 @@ export default function ProjectsListPage() {
   const [showFilters, setShowFilters] = useState(false);
 
   const isAdmin = user?.role === 'admin';
-  const isTeamMember = TEAM_MEMBER_ROLES.includes(user?.role);
 
   useEffect(() => {
     fetchProjects();
@@ -498,7 +490,6 @@ export default function ProjectsListPage() {
               project={project}
               onDelete={handleDeleteClick}
               isAdmin={isAdmin}
-              isTeamMember={isTeamMember}
               navigate={navigate}
             />
           ))}

@@ -7,16 +7,16 @@ import { Card, CardBody, CardHeader, Button, Badge, Spinner } from '@/components
 import ProjectSummary from './ProjectSummary';
 import {
   ArrowLeft, ClipboardList, Play, CheckCircle, Clock,
-  Eye, Palette, Code
+  Eye, Palette, Code, Video, FileText
 } from 'lucide-react';
 
 const TASK_TYPES = {
   graphic_design: { label: 'Graphic Design', icon: Palette },
-  video_editing: { label: 'Video Editing', icon: Palette },
+  video_editing: { label: 'Video Editing', icon: Video },
   landing_page_design: { label: 'Landing Page Design', icon: Eye },
   landing_page_development: { label: 'Landing Page Development', icon: Code },
-  content_creation: { label: 'Content Creation', icon: ClipboardList },
-  content_writing: { label: 'Content Writing', icon: ClipboardList },
+  content_creation: { label: 'Content Creation', icon: FileText },
+  content_writing: { label: 'Content Writing', icon: FileText },
 };
 
 const STATUS_CONFIG = {
@@ -98,8 +98,8 @@ export default function TeamMemberProjectView() {
       return task.taskType === 'video_editing';
     }
     if (isContentWriter) {
-      // Content Writers see content_creation tasks
-      return task.taskType === 'content_creation';
+      // Content Writers see content_creation tasks (handles both content_creation and content_writing)
+      return task.taskType === 'content_creation' || task.taskType === 'content_writing';
     }
     return false;
   });
@@ -109,7 +109,7 @@ export default function TeamMemberProjectView() {
     ['todo', 'content_pending', 'design_pending', 'development_pending'].includes(t.status)
   );
   const inProgressTasks = filteredTasks.filter(t =>
-    ['in_progress', 'submitted', 'content_submitted', 'design_submitted', 'development_submitted'].includes(t.status)
+    ['in_progress', 'submitted', 'content_submitted', 'design_submitted', 'development_submitted', 'content_rejected', 'design_rejected', 'rejected'].includes(t.status)
   );
   const completedTasks = filteredTasks.filter(t =>
     ['approved_by_tester', 'content_approved', 'design_approved', 'development_approved', 'final_approved', 'content_final_approved'].includes(t.status)

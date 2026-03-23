@@ -138,7 +138,9 @@ export default function ProjectDetailPage() {
   const isDesigner = user?.role === 'graphic_designer' || user?.role === 'ui_ux_designer';
   const isDeveloper = user?.role === 'developer';
   const isTester = user?.role === 'tester';
-  const isTeamMember = isDesigner || isDeveloper || isTester;
+  const isContentWriter = user?.role === 'content_writer';
+  const isVideoEditor = user?.role === 'video_editor';
+  const isTeamMember = isDesigner || isDeveloper || isTester || isContentWriter || isVideoEditor;
 
   useEffect(() => {
     fetchProject();
@@ -252,8 +254,8 @@ export default function ProjectDetailPage() {
     return <TesterProjectView />;
   }
 
-  // Designer/Developer: Show TeamMemberProjectView
-  if (isDesigner || isDeveloper) {
+  // Designer/Developer/Content Writer/Video Editor: Show TeamMemberProjectView
+  if (isDesigner || isDeveloper || isContentWriter || isVideoEditor) {
     return <TeamMemberProjectView />;
   }
 
