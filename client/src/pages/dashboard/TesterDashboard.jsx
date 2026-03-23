@@ -217,12 +217,17 @@ export default function TesterDashboard({ user }) {
       setMyTasks(assignedTasks);
       setProjects(allProjects);
 
-      // Tasks that have been reviewed by tester (approved or rejected)
-      const reviewed = pendingTasks.filter(t =>
-        ['approved_by_tester', 'content_final_approved', 'design_approved', 'development_approved', 'rejected'].includes(t.status)
+      // Tasks that have been reviewed by this tester
+      // These are tasks where testerReviewedBy equals the current user
+      const currentUserId = user?._id;
+      const reviewed = assignedTasks.filter(t =>
+        t.testerReviewedBy?._id === currentUserId ||
+        t.testerReviewedBy === currentUserId ||
+        ['approved_by_tester', 'content_final_approved', 'design_approved', 'development_approved', 'content_rejected', 'design_rejected'].includes(t.status)
       ).slice(0, 5);
       setRecentlyReviewed(reviewed);
-      calculateStats(pendingTasks, reviewed, assignedTasks);
+
+      calculateStats(pendingTasks, assignedTasks, reviewed);
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
       setError(err.message || 'Failed to load dashboard data');
@@ -231,50 +236,66 @@ export default function TesterDashboard({ user }) {
     }
   };
 
-  const calculateStats = (pending, reviewed, assigned) => {
-    // Tasks waiting for tester review
-    const totalPending = pending.filter(t =>
+  const calculateStats = (pendingTasks, assignedTasks, reviewedTasks) => {
+    // Tasks waiting for tester review (submitted statuses)
+    const totalPending = pendingTasks.filter(t =>
       ['submitted', 'design_submitted', 'content_submitted', 'development_submitted'].includes(t.status)
     ).length;
 
-    // Tasks approved by tester (any approved status)
-    const approvedCount = reviewed.filter(t =>
+    // Tasks approved by tester
+    const approvedCount = assignedTasks.filter(t =>
       ['approved_by_tester', 'content_final_approved', 'design_approved', 'development_approved'].includes(t.status)
     ).length;
 
-    // Tasks rejected
-    const rejectedCount = reviewed.filter(t =>
-      ['rejected', 'content_rejected', 'design_rejected'].includes(t.status)
+    // Tasks rejected by tester
+    const rejectedCount = assignedTasks.filter(t =>
+      ['content_rejected', 'design_rejected', 'rejected'].includes(t.status)
     ).length;
 
     setStats({
       totalPending,
-      totalReviewed: reviewed.length,
+      totalReviewed: reviewedTasks.length,
       approvedCount,
       rejectedCount,
-      myAssignedTasks: assigned.length,
+      myAssignedTasks: assignedTasks.length,
     });
   };
 
   // Prepare pie chart data for review status distribution
   const getReviewStatusData = () => {
-    const pending = stats.totalPending;
-    const approved = stats.approvedCount;
-    const rejected = stats.rejectedCount;
+    // Count by actual task status
+    const pending = pendingReview.filter(t =>
+      ['submitted', 'design_submitted', 'content_submitted', 'development_submitted'].includes(t.status)
+    ).length;
+
+    const approved = myTasks.filter(t =>
+      ['approved_by_tester', 'content_final_approved', 'design_approved', 'development_approved'].includes(t.status)
+    ).length;
+
+    const rejected = myTasks.filter(t =>
+      ['content_rejected', 'design_rejected', 'rejected'].includes(t.status)
+    ).length;
 
     const data = [
       { name: 'Pending Review', value: pending, color: CHART_COLORS.pending },
       { name: 'Approved', value: approved, color: CHART_COLORS.approved },
       { name: 'Rejected', value: rejected, color: CHART_COLORS.rejected },
     ];
-    return data.filter(item => item.value > 0);
+
+    // Always show all categories, even if 0
+    return data;
   };
 
   // Prepare bar chart data - tasks by type pending review
   const getTasksByTypeData = () => {
     const typeCount = {};
 
-    pendingReview.forEach(task => {
+    // Filter to only submitted tasks awaiting review
+    const submittedTasks = pendingReview.filter(t =>
+      ['submitted', 'design_submitted', 'content_submitted', 'development_submitted'].includes(t.status)
+    );
+
+    submittedTasks.forEach(task => {
       const type = task.taskType || task.creativeType || 'other';
       const label = TASK_TYPE_LABELS[type] || type.replace(/_/g, ' ');
 
@@ -291,19 +312,6 @@ export default function TesterDashboard({ user }) {
     return Object.values(typeCount)
       .sort((a, b) => b.count - a.count)
       .slice(0, 6);
-  };
-
-  // Get pending review tasks grouped by type
-  const getPendingByType = () => {
-    const grouped = {};
-    pendingReview.forEach(task => {
-      const type = task.taskType || task.creativeType || 'other';
-      if (!grouped[type]) {
-        grouped[type] = [];
-      }
-      grouped[type].push(task);
-    });
-    return grouped;
   };
 
   // Handle review action
@@ -339,7 +347,6 @@ export default function TesterDashboard({ user }) {
 
   const reviewStatusData = getReviewStatusData();
   const tasksByTypeData = getTasksByTypeData();
-  const pendingByType = getPendingByType();
   const pendingTasks = pendingReview.filter(t =>
     ['submitted', 'design_submitted', 'content_submitted', 'development_submitted'].includes(t.status)
   ).slice(0, 6);
@@ -436,12 +443,12 @@ export default function TesterDashboard({ user }) {
             ))}
           </div>
 
-          {reviewStatusData.length > 0 ? (
+          {stats.totalPending > 0 || stats.approvedCount > 0 || stats.rejectedCount > 0 ? (
             <div className="h-52">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={reviewStatusData}
+                    data={reviewStatusData.filter(item => item.value > 0)}
                     cx="50%"
                     cy="50%"
                     innerRadius={52}
@@ -450,7 +457,7 @@ export default function TesterDashboard({ user }) {
                     dataKey="value"
                     strokeWidth={0}
                   >
-                    {reviewStatusData.map((entry, index) => (
+                    {reviewStatusData.filter(item => item.value > 0).map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>

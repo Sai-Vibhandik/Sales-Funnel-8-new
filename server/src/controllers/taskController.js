@@ -1772,6 +1772,7 @@ exports.getMyRoleTasks = async (req, res, next) => {
 
     // Map user role to task assignedRole
     const roleMap = {
+      'content_creator': 'content_writer',
       'content_writer': 'content_writer',
       'graphic_designer': 'graphic_designer',
       'video_editor': 'video_editor',
@@ -1794,9 +1795,24 @@ exports.getMyRoleTasks = async (req, res, next) => {
 
     // Role-specific status filters
     if (assignedRole === 'tester') {
-      // Testers see tasks that are submitted for review AND assigned to them specifically
-      query.status = { $in: ['content_submitted', 'design_submitted', 'development_submitted'] };
-      query.testerId = req.user._id;
+      // Testers see:
+      // 1. Tasks submitted for review (assigned to them)
+      // 2. Tasks they have reviewed (approved or rejected)
+      const userId = req.user._id;
+      query = {
+        $or: [
+          // Currently pending review - assigned to this tester
+          {
+            status: { $in: ['content_submitted', 'design_submitted', 'development_submitted'] },
+            testerId: userId
+          },
+          // Previously reviewed by this tester (approved or rejected)
+          {
+            testerReviewedBy: userId,
+            status: { $in: ['approved_by_tester', 'content_final_approved', 'design_approved', 'development_approved', 'content_rejected', 'design_rejected'] }
+          }
+        ]
+      };
     } else if (assignedRole === 'performance_marketer') {
       // Performance marketers see tasks pending their approval AND assigned to them specifically
       // Note: Content goes from Tester → Designer, NOT to Marketer
@@ -1807,11 +1823,11 @@ exports.getMyRoleTasks = async (req, res, next) => {
       // For creators, designers, developers - show their assigned tasks
       // Also include tasks where they were the original assignee (submitted tasks)
       const statuses = {
-        content_writer: ['content_pending', 'content_submitted', 'content_final_approved', 'final_approved', 'content_rejected'],
-        graphic_designer: ['design_pending', 'design_submitted', 'design_approved', 'final_approved', 'design_rejected'],
-        video_editor: ['design_pending', 'design_submitted', 'design_approved', 'final_approved', 'design_rejected'],
-        ui_ux_designer: ['design_pending', 'design_submitted', 'design_approved', 'final_approved', 'design_rejected'],
-        developer: ['development_pending', 'development_submitted', 'development_approved', 'final_approved']
+        content_writer: ['content_pending', 'content_submitted', 'content_final_approved', 'final_approved', 'content_rejected', 'content_approved', 'approved_by_tester'],
+        graphic_designer: ['design_pending', 'design_submitted', 'design_approved', 'final_approved', 'design_rejected', 'approved_by_tester'],
+        video_editor: ['design_pending', 'design_submitted', 'design_approved', 'final_approved', 'design_rejected', 'approved_by_tester'],
+        ui_ux_designer: ['design_pending', 'design_submitted', 'design_approved', 'final_approved', 'design_rejected', 'approved_by_tester'],
+        developer: ['development_pending', 'development_submitted', 'development_approved', 'final_approved', 'approved_by_tester']
       };
 
       const roleStatuses = statuses[assignedRole] || [];
@@ -1819,14 +1835,19 @@ exports.getMyRoleTasks = async (req, res, next) => {
 
       if (status) {
         // Specific status filter requested
+        // Must match status AND belong to this user (either currently assigned or originally assigned)
         query = {
+          status: status,
           $or: [
-            { assignedTo: userId, status: status },
-            { originalAssignedTo: userId, status: status },
-            // Fallback for tasks without originalAssignedTo - use assignedRole match
-            { assignedTo: userId, assignedRole: assignedRole, status: status, originalAssignedTo: { $exists: false } }
+            // Currently assigned to this user
+            { assignedTo: userId, assignedRole: assignedRole },
+            // Originally assigned to this user (for submitted/completed tasks)
+            { originalAssignedTo: userId },
+            // Fallback for existing tasks without originalAssignedTo
+            { assignedTo: userId, originalAssignedTo: { $exists: false } }
           ]
         };
+        console.log('Status filter query:', JSON.stringify(query, null, 2));
       } else if (roleStatuses.length > 0) {
         // Show tasks with role-specific statuses
         // Include both currently assigned tasks AND tasks originally assigned to this user
@@ -1851,11 +1872,18 @@ exports.getMyRoleTasks = async (req, res, next) => {
 
     if (projectId) query.projectId = projectId;
 
+    console.log('Final query:', JSON.stringify(query, null, 2));
+
     const tasks = await Task.find(query)
       .populate('projectId', 'projectName businessName industry')
       .populate('assignedTo', 'name email role')
       .populate('assignedBy', 'name email')
       .sort({ dueDate: 1, createdAt: -1 });
+
+    console.log('Tasks found:', tasks.length);
+    if (tasks.length > 0) {
+      console.log('Task statuses:', tasks.map(t => ({ id: t._id, status: t.status, assignedTo: t.assignedTo?._id, originalAssignedTo: t.originalAssignedTo })));
+    }
 
     // Filter out tasks where project was deleted (projectId will be null after populate)
     const validTasks = tasks.filter(task => task.projectId !== null);
@@ -1884,6 +1912,7 @@ exports.getMyCreativeTasks = async (req, res, next) => {
 
     // Map user role to assignedRole in creativePlan
     const roleMap = {
+      'content_creator': 'content_writer',
       'content_writer': 'content_writer',
       'graphic_designer': 'graphic_designer',
       'video_editor': 'video_editor'
@@ -2231,6 +2260,7 @@ exports.getTaskStats = async (req, res, next) => {
 
     // Map frontend role names to database assignedRole values
     const roleMap = {
+      'content_creator': 'content_writer',
       'content_writer': 'content_writer',
       'graphic_designer': 'graphic_designer',
       'developer': 'developer',

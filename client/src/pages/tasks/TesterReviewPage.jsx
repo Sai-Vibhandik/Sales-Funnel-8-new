@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Card, CardBody, Button, Spinner, Textarea, Badge } from '@/components/ui';
 import { taskService } from '@/services/api';
 import {
   Clock, CheckCircle, XCircle, Eye, FileText, Palette, Video, Layout, Code,
-  AlertCircle, ExternalLink, Link, MessageSquare, FileIcon
+  AlertCircle, ExternalLink, Link, MessageSquare, FileIcon, ArrowLeft, ExternalLink as ExternalLinkIcon
 } from 'lucide-react';
 
 const TASK_TYPES = {
@@ -24,6 +24,10 @@ const STATUS_LABELS = {
 
 export default function TesterReviewPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const highlightedTaskId = location.state?.taskId;
+  const highlightedRef = useRef(null);
+
   const [loading, setLoading] = useState(true);
   const [tasks, setTasks] = useState([]);
   const [selectedTask, setSelectedTask] = useState(null);
@@ -34,6 +38,13 @@ export default function TesterReviewPage() {
   useEffect(() => {
     fetchPendingTasks();
   }, []);
+
+  // Scroll to highlighted task after tasks are loaded
+  useEffect(() => {
+    if (highlightedTaskId && tasks.length > 0 && highlightedRef.current) {
+      highlightedRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [highlightedTaskId, tasks]);
 
   const fetchPendingTasks = async () => {
     try {
@@ -138,16 +149,25 @@ export default function TesterReviewPage() {
         </Card>
       ) : (
         <div className="space-y-4">
-          {tasks.map((task) => (
-            <Card key={task._id}>
-              <CardBody className="p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      {getTaskTypeBadge(task.taskType)}
-                      {getStatusBadge(task.status)}
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900">{task.taskTitle}</h3>
+          {tasks.map((task) => {
+            const isHighlighted = task._id === highlightedTaskId;
+            return (
+              <Card
+                key={task._id}
+                ref={isHighlighted ? highlightedRef : null}
+                className={isHighlighted ? 'ring-2 ring-orange-500 border-orange-300' : ''}
+              >
+                <CardBody className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        {getTaskTypeBadge(task.taskType)}
+                        {getStatusBadge(task.status)}
+                        {isHighlighted && (
+                          <Badge className="bg-orange-100 text-orange-800">Selected for review</Badge>
+                        )}
+                      </div>
+                      <h3 className="text-lg font-semibold text-gray-900">{task.taskTitle}</h3>
 
                     <div className="mt-2 flex items-center gap-4 text-sm text-gray-500">
                       <span>Project: {task.projectId?.projectName || task.projectId?.businessName || 'Unknown'}</span>
@@ -469,6 +489,15 @@ export default function TesterReviewPage() {
                   <div className="flex flex-col gap-2 ml-4">
                     <Button
                       size="sm"
+                      variant="outline"
+                      onClick={() => navigate(`/tasks/${task._id}`)}
+                      className="text-blue-600 border-blue-300 hover:bg-blue-50"
+                    >
+                      <Eye className="w-4 h-4 mr-1" />
+                      View Full Details
+                    </Button>
+                    <Button
+                      size="sm"
                       onClick={() => handleApprove(task)}
                       className="bg-green-600 hover:bg-green-700"
                     >
@@ -488,7 +517,8 @@ export default function TesterReviewPage() {
                 </div>
               </CardBody>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
 

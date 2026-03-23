@@ -9,6 +9,7 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import { STATUS_CONFIG, getStatusConfig, TASK_STATUSES } from '@/constants/taskStatuses';
+import { useAuth } from '@/context/AuthContext';
 
 const TASK_TYPES = [
   { id: 'graphic_design', label: 'Graphic Design', icon: Palette },
@@ -17,6 +18,39 @@ const TASK_TYPES = [
   { id: 'landing_page_development', label: 'Landing Page Development', icon: Code },
   { id: 'content_writing', label: 'Content Writing', icon: FileText },
 ];
+
+// Role-specific status filters
+// Only show statuses that are relevant and meaningful for each role
+const ROLE_STATUSES = {
+  // Content writers: see content workflow statuses
+  content_writer: ['content_pending', 'content_submitted', 'content_final_approved', 'content_rejected'],
+  content_creator: ['content_pending', 'content_submitted', 'content_final_approved', 'content_rejected'],
+  // Designers/Video Editors: see design workflow statuses
+  graphic_designer: ['design_pending', 'design_submitted', 'design_approved', 'design_rejected'],
+  video_editor: ['design_pending', 'design_submitted', 'design_approved', 'design_rejected'],
+  ui_ux_designer: ['design_pending', 'design_submitted', 'design_approved', 'design_rejected'],
+  // Developers: see development workflow statuses
+  developer: ['development_pending', 'development_submitted', 'development_approved'],
+  // Testers: see submitted statuses for review
+  tester: ['content_submitted', 'design_submitted', 'development_submitted'],
+  // Marketers: see approved statuses for final review
+  performance_marketer: ['design_approved', 'development_approved', 'final_approved', 'rejected'],
+  // Admin: sees all
+  admin: TASK_STATUSES,
+};
+
+// Role-specific task types
+const ROLE_TASK_TYPES = {
+  content_writer: [{ id: 'content_writing', label: 'Content Writing', icon: FileText }],
+  content_creator: [{ id: 'content_writing', label: 'Content Writing', icon: FileText }],
+  graphic_designer: [{ id: 'graphic_design', label: 'Graphic Design', icon: Palette }],
+  video_editor: [{ id: 'video_editing', label: 'Video Editing', icon: Video }],
+  ui_ux_designer: [{ id: 'landing_page_design', label: 'Landing Page Design', icon: Layout }],
+  developer: [{ id: 'landing_page_development', label: 'Landing Page Development', icon: Code }],
+  tester: TASK_TYPES, // Testers can see all task types
+  performance_marketer: TASK_TYPES, // Marketers can see all task types
+  admin: TASK_TYPES, // Admin sees all
+};
 
 const ASSET_TYPES = [
   { id: 'image_creative', label: 'Image Creative' },
@@ -29,6 +63,7 @@ const ASSET_TYPES = [
 ];
 
 export default function TasksPage() {
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const projectId = searchParams.get('projectId');
   const navigate = useNavigate();
@@ -51,7 +86,26 @@ export default function TasksPage() {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
 
-  const userRole = localStorage.getItem('userRole');
+  const userRole = user?.role;
+
+  // Get role-specific statuses with fallback
+  const getRoleStatuses = () => {
+    if (ROLE_STATUSES[userRole]) {
+      return ROLE_STATUSES[userRole];
+    }
+    // Fallback: return empty array for unknown roles (user should see no filter options)
+    console.warn(`Unknown role '${userRole}' - no status filters available`);
+    return [];
+  };
+
+  // Get role-specific task types with fallback
+  const getRoleTaskTypes = () => {
+    if (ROLE_TASK_TYPES[userRole]) {
+      return ROLE_TASK_TYPES[userRole];
+    }
+    // Fallback: return empty array for unknown roles
+    return [];
+  };
 
   useEffect(() => {
     // Fetch project details if projectId is provided
@@ -290,10 +344,10 @@ export default function TasksPage() {
               <select
                 value={filter.status}
                 onChange={(e) => setFilter({ ...filter, status: e.target.value })}
-                className="px-3 py-2 border border-gray-300 rounded-lg"
+                className="px-3 py-2 border border-gray-300 rounded-lg min-w-[160px]"
               >
                 <option value="">All Statuses</option>
-                {TASK_STATUSES.map((status) => (
+                {getRoleStatuses().map((status) => (
                   <option key={status} value={status}>{STATUS_CONFIG[status]?.label || status}</option>
                 ))}
               </select>
@@ -303,10 +357,10 @@ export default function TasksPage() {
               <select
                 value={filter.taskType}
                 onChange={(e) => setFilter({ ...filter, taskType: e.target.value })}
-                className="px-3 py-2 border border-gray-300 rounded-lg"
+                className="px-3 py-2 border border-gray-300 rounded-lg min-w-[160px]"
               >
                 <option value="">All Types</option>
-                {TASK_TYPES.map((type) => (
+                {getRoleTaskTypes().map((type) => (
                   <option key={type.id} value={type.id}>{type.label}</option>
                 ))}
               </select>
