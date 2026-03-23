@@ -139,7 +139,6 @@ export default function ContentWriterDashboard({ user }) {
   const [stats, setStats] = useState({
     totalTasks: 0,
     pendingContent: 0,
-    inProgressContent: 0,
     completedContent: 0,
     rejectedContent: 0,
   });
@@ -175,47 +174,44 @@ export default function ContentWriterDashboard({ user }) {
 
   const calculateStats = (taskList) => {
     // Content writer sees tasks in content workflow statuses
+    // Pending = needs to start writing (includes todo, in_progress, content_pending)
     const pendingContent = taskList.filter(t =>
-      ['content_pending', 'content_rejected'].includes(t.status)
+      ['content_pending', 'todo', 'in_progress'].includes(t.status)
     ).length;
 
-    const inProgressContent = taskList.filter(t =>
-      ['content_submitted'].includes(t.status)
-    ).length;
-
-    // Completed = content_final_approved (ready for design) or final_approved (fully done)
-    const completedContent = taskList.filter(t =>
-      ['content_final_approved', 'final_approved'].includes(t.status)
-    ).length;
-
+    // Rejected = needs revision
     const rejectedContent = taskList.filter(t =>
-      ['content_rejected'].includes(t.status)
+      t.status === 'content_rejected'
+    ).length;
+
+    // Completed = writer's work is done (submitted for review, approved, or fully complete)
+    const completedContent = taskList.filter(t =>
+      ['content_submitted', 'content_final_approved', 'final_approved', 'content_approved', 'approved_by_tester', 'submitted'].includes(t.status)
     ).length;
 
     setStats({
       totalTasks: taskList.length,
       pendingContent,
-      inProgressContent,
       completedContent,
       rejectedContent,
     });
   };
 
-  // Prepare pie chart data for content status (In Progress, Completed, Pending)
+  // Prepare pie chart data for content status (Pending, Completed, Rejected)
   const getTaskStatusData = () => {
     const data = [
       { name: 'Pending', value: stats.pendingContent, color: CHART_COLORS.pending },
-      { name: 'In Progress', value: stats.inProgressContent, color: CHART_COLORS.inProgress },
       { name: 'Completed', value: stats.completedContent, color: CHART_COLORS.approved },
+      { name: 'Rejected', value: stats.rejectedContent, color: CHART_COLORS.rejected },
     ];
-    return data.filter(item => item.value > 0);
+    return data;
   };
 
-  // Prepare bar chart data - tasks per project
+  // Prepare bar chart data - tasks per project with proper status breakdown
   const getTasksPerProjectData = () => {
     const projectTaskCount = {};
 
-    // Group tasks by project and count
+    // Group tasks by project and count by status
     tasks.forEach(task => {
       const projectId = task.projectId?._id || task.projectId;
       const projectName = task.projectId?.projectName || task.projectId?.businessName || 'Unknown';
@@ -226,13 +222,23 @@ export default function ContentWriterDashboard({ user }) {
           fullName: projectName,
           total: 0,
           completed: 0,
+          pending: 0,
+          rejected: 0,
         };
       }
 
       projectTaskCount[projectId].total++;
 
-      if (['content_final_approved', 'final_approved'].includes(task.status)) {
+      // Categorize by status - from writer's perspective
+      if (['content_submitted', 'content_final_approved', 'final_approved', 'content_approved', 'approved_by_tester', 'submitted'].includes(task.status)) {
+        // Writer's work is complete (submitted for review or approved)
         projectTaskCount[projectId].completed++;
+      } else if (task.status === 'content_rejected') {
+        // Needs revision
+        projectTaskCount[projectId].rejected++;
+      } else {
+        // content_pending, todo, in_progress, or other statuses - needs to be written
+        projectTaskCount[projectId].pending++;
       }
     });
 
@@ -244,7 +250,8 @@ export default function ContentWriterDashboard({ user }) {
         name: item.name,
         fullName: item.fullName,
         completed: item.completed,
-        pending: item.total - item.completed,
+        pending: item.pending,
+        rejected: item.rejected,
       }));
   };
 
@@ -371,20 +378,20 @@ export default function ContentWriterDashboard({ user }) {
           iconBg="bg-gradient-to-br from-yellow-400 to-yellow-600"
         />
         <StatCard
-          title="In Progress"
-          value={String(stats.inProgressContent)}
-          change={stats.inProgressContent > 0 ? 'Being written' : null}
-          changeType="neutral"
-          icon={Send}
-          iconBg="bg-gradient-to-br from-blue-400 to-blue-600"
-        />
-        <StatCard
           title="Completed"
           value={String(stats.completedContent)}
           change={stats.completedContent > 0 ? '+this week' : null}
           changeType="positive"
           icon={CheckCircle}
           iconBg="bg-gradient-to-br from-green-400 to-green-600"
+        />
+        <StatCard
+          title="Rejected"
+          value={String(stats.rejectedContent)}
+          change={stats.rejectedContent > 0 ? 'Needs revision' : null}
+          changeType="negative"
+          icon={XCircle}
+          iconBg="bg-gradient-to-br from-red-400 to-red-600"
         />
       </div>
 
@@ -398,7 +405,7 @@ export default function ContentWriterDashboard({ user }) {
             </div>
             <div>
               <h3 className="font-semibold text-gray-900">Content Progress</h3>
-              <p className="text-sm text-gray-500">Pending, In Progress & Completed</p>
+              <p className="text-sm text-gray-500">Pending, Completed & Rejected</p>
             </div>
           </div>
 
@@ -416,12 +423,12 @@ export default function ContentWriterDashboard({ user }) {
             ))}
           </div>
 
-          {taskStatusData.length > 0 ? (
+          {stats.totalTasks > 0 ? (
             <div className="h-52">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={taskStatusData}
+                    data={taskStatusData.filter(item => item.value > 0)}
                     cx="50%"
                     cy="50%"
                     innerRadius={52}
@@ -430,7 +437,7 @@ export default function ContentWriterDashboard({ user }) {
                     dataKey="value"
                     strokeWidth={0}
                   >
-                    {taskStatusData.map((entry, index) => (
+                    {taskStatusData.filter(item => item.value > 0).map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
@@ -467,7 +474,7 @@ export default function ContentWriterDashboard({ user }) {
               </div>
               <div>
                 <h3 className="font-semibold text-gray-900">Tasks by Project</h3>
-                <p className="text-sm text-gray-500">Completed vs pending</p>
+                <p className="text-sm text-gray-500">Status breakdown</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
@@ -478,6 +485,10 @@ export default function ContentWriterDashboard({ user }) {
               <div className="flex items-center gap-1.5">
                 <span className="inline-block w-2.5 h-2.5 rounded-sm bg-yellow-500" />
                 <span className="text-xs text-gray-500">Pending</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="inline-block w-2.5 h-2.5 rounded-sm bg-red-500" />
+                <span className="text-xs text-gray-500">Rejected</span>
               </div>
             </div>
           </div>
@@ -514,8 +525,12 @@ export default function ContentWriterDashboard({ user }) {
                   />
                   <Tooltip
                     formatter={(value, name) => {
-                      const label = name === 'completed' ? 'Completed' : 'Pending';
-                      return [`${value} task${value !== 1 ? 's' : ''}`, label];
+                      const labels = {
+                        completed: 'Completed',
+                        pending: 'Pending',
+                        rejected: 'Rejected'
+                      };
+                      return [`${value} task${value !== 1 ? 's' : ''}`, labels[name] || name];
                     }}
                     contentStyle={{
                       backgroundColor: 'white',
@@ -528,7 +543,8 @@ export default function ContentWriterDashboard({ user }) {
                     cursor={{ fill: 'rgba(0,0,0,0.04)' }}
                   />
                   <Bar dataKey="completed" stackId="a" fill="#10B981" radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="pending" stackId="a" fill="#F59E0B" radius={[0, 6, 6, 0]} />
+                  <Bar dataKey="pending" stackId="a" fill="#F59E0B" radius={[0, 0, 0, 0]} />
+                  <Bar dataKey="rejected" stackId="a" fill="#EF4444" radius={[0, 6, 6, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -628,7 +644,7 @@ export default function ContentWriterDashboard({ user }) {
       </div>
 
       {/* Content Writing Tips */}
-      <div className="chart-container-enhanced">
+      {/* <div className="chart-container-enhanced">
         <div className="flex items-center gap-3 mb-4">
           <div className="p-2.5 rounded-xl bg-gradient-to-br from-purple-400 to-purple-500">
             <Sparkles size={20} className="text-white" />
@@ -669,7 +685,7 @@ export default function ContentWriterDashboard({ user }) {
             </div>
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

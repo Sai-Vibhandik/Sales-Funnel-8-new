@@ -1144,14 +1144,14 @@ export default function TaskDetailPage() {
           )}
 
           {/* Rejection Note */}
-          {task.status === 'rejected' && task.rejectionNote && (
+          {['rejected', 'content_rejected', 'design_rejected'].includes(task.status) && (task.rejectionNote || task.rejectionReason) && (
             <Card className="border-red-200">
               <CardBody className="p-6 bg-red-50">
                 <div className="flex items-start gap-3">
                   <AlertCircle className="w-5 h-5 text-red-500 mt-0.5" />
                   <div>
                     <h3 className="font-medium text-red-800">Rejection Feedback</h3>
-                    <p className="mt-1 text-red-700">{task.rejectionNote}</p>
+                    <p className="mt-1 text-red-700">{task.rejectionNote || task.rejectionReason}</p>
                   </div>
                 </div>
               </CardBody>
@@ -1325,7 +1325,19 @@ export default function TaskDetailPage() {
                   Content approved, awaiting marketer review
                 </div>
               )}
-              {task.status === 'content_rejected' && task.rejectionNote && (
+              {task.status === 'content_rejected' && (task.rejectionNote || task.rejectionReason) && (
+                <div className="p-3 bg-red-50 rounded-lg border border-red-200">
+                  <p className="text-sm text-red-800 font-medium mb-1">
+                    <AlertCircle className="w-4 h-4 inline mr-1" />
+                    Content Rejected - Action Required
+                  </p>
+                  <p className="text-sm text-red-700 mt-1">
+                    <span className="font-medium">Reason: </span>
+                    {task.rejectionNote || task.rejectionReason}
+                  </p>
+                </div>
+              )}
+              {task.status === 'content_rejected' && !(task.rejectionNote || task.rejectionReason) && (
                 <div className="p-3 bg-red-50 rounded-lg border border-red-200">
                   <p className="text-sm text-red-800">
                     <AlertCircle className="w-4 h-4 inline mr-1" />

@@ -100,6 +100,13 @@ const taskSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   },
+  // Original assignee - tracks who was originally assigned to work on this task
+  // This persists even when assignedTo changes during workflow (e.g., submitted to tester)
+  originalAssignedTo: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    description: 'The original assignee who worked on this task'
+  },
   assignedRole: {
     type: String,
     enum: ['content_creator', 'content_writer', 'graphic_designer', 'video_editor', 'ui_ux_designer', 'developer', 'tester', 'performance_marketer'],

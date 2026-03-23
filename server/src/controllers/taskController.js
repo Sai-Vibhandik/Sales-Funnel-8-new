@@ -199,6 +199,7 @@ exports.createTask = async (req, res, next) => {
       assetType,
       taskTitle,
       assignedTo: assignedTo || null,
+      originalAssignedTo: assignedTo || null, // Track original assignee
       assignedRole: role,
       assignedBy: req.user._id,
       createdBy: req.user._id,
@@ -1804,19 +1805,47 @@ exports.getMyRoleTasks = async (req, res, next) => {
       query.marketerId = req.user._id;
     } else {
       // For creators, designers, developers - show their assigned tasks
-      query.assignedRole = assignedRole;
-      query.assignedTo = req.user._id;
+      // Also include tasks where they were the original assignee (submitted tasks)
       const statuses = {
-        content_writer: ['content_pending', 'content_rejected'],
-        graphic_designer: ['design_pending', 'design_rejected'],
-        video_editor: ['design_pending', 'design_rejected'],
-        ui_ux_designer: ['design_pending', 'design_rejected'],
-        developer: ['development_pending']
+        content_writer: ['content_pending', 'content_submitted', 'content_final_approved', 'final_approved', 'content_rejected'],
+        graphic_designer: ['design_pending', 'design_submitted', 'design_approved', 'final_approved', 'design_rejected'],
+        video_editor: ['design_pending', 'design_submitted', 'design_approved', 'final_approved', 'design_rejected'],
+        ui_ux_designer: ['design_pending', 'design_submitted', 'design_approved', 'final_approved', 'design_rejected'],
+        developer: ['development_pending', 'development_submitted', 'development_approved', 'final_approved']
       };
+
+      const roleStatuses = statuses[assignedRole] || [];
+      const userId = req.user._id;
+
       if (status) {
-        query.status = status;
-      } else if (statuses[assignedRole]) {
-        query.status = { $in: statuses[assignedRole] };
+        // Specific status filter requested
+        query = {
+          $or: [
+            { assignedTo: userId, status: status },
+            { originalAssignedTo: userId, status: status },
+            // Fallback for tasks without originalAssignedTo - use assignedRole match
+            { assignedTo: userId, assignedRole: assignedRole, status: status, originalAssignedTo: { $exists: false } }
+          ]
+        };
+      } else if (roleStatuses.length > 0) {
+        // Show tasks with role-specific statuses
+        // Include both currently assigned tasks AND tasks originally assigned to this user
+        query = {
+          $or: [
+            // Currently assigned to this user
+            { assignedTo: userId, assignedRole: assignedRole, status: { $in: roleStatuses } },
+            // Originally assigned to this user (for submitted/completed tasks)
+            { originalAssignedTo: userId, status: { $in: roleStatuses } },
+            // Fallback for existing tasks without originalAssignedTo
+            { assignedTo: userId, assignedRole: assignedRole, status: { $in: roleStatuses }, originalAssignedTo: { $exists: false } }
+          ]
+        };
+      } else {
+        // Fallback
+        query = {
+          assignedRole: assignedRole,
+          assignedTo: userId
+        };
       }
     }
 

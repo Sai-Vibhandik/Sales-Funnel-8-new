@@ -362,6 +362,7 @@ exports.addCreative = async (req, res, next) => {
         creativeStage: stage,
         taskType: 'content_writing',
         assignedTo: assignedContentWriter,
+        originalAssignedTo: assignedContentWriter, // Track original assignee
         assignedBy: req.user._id,
         title: `Content for: ${name || `Creative ${creativeStrategy.stages[stageIndex].creatives.length}`}`,
         description: notes || `Write content for ${creativeType} creative on ${platform}`,
