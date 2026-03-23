@@ -540,26 +540,12 @@ exports.testerReview = async (req, res, next) => {
       // Determine next status based on task type and current status
       if (task.status === 'content_submitted') {
         // Content approved by tester - content is finalized, design can start
-        // Assign to Designer/Video Editor (NOT Performance Marketer)
-        // Marketer will only review the final design/video
+        // The content task is complete, NOT assigned to marketer
+        // The paired design task should be activated and assigned to designer
         newStatus = 'content_final_approved';
-
-        // Determine which role should receive the design task based on creativeOutputType
-        const videoTypes = ['video_creative', 'ugc_content', 'testimonial_content', 'demo_video', 'reel'];
-        const isVideoTask = task.creativeOutputType && videoTypes.includes(task.creativeOutputType);
-
-        if (isVideoTask) {
-          task.assignedRole = 'video_editor';
-        } else {
-          task.assignedRole = 'graphic_designer';
-        }
-
-        // Assign to the first team member from assignedTeamMembers if available
-        if (task.assignedTeamMembers && task.assignedTeamMembers.length > 0) {
-          task.assignedTo = task.assignedTeamMembers[0]._id || task.assignedTeamMembers[0];
-        }
-
-        notificationMessage = `Your content for "${task.taskTitle}" has been approved and is ready for ${isVideoTask ? 'video editing' : 'design'}.`;
+        // Keep content task assigned to content_writer for history
+        // The designer assignment will happen on the design task below
+        notificationMessage = `Your content for "${task.taskTitle}" has been approved by the tester.`;
         notificationType = 'content_final_approved';
       } else if (task.taskType === 'landing_page_design' || task.status === 'design_submitted') {
         // Design approved by tester - goes to marketer for final approval
@@ -592,25 +578,82 @@ exports.testerReview = async (req, res, next) => {
         notificationType = 'task_approved_by_tester';
       }
     } else {
-      // Rejected - determine the rejection status
+      // Rejected - determine the rejection status and reassign to appropriate role
+      // Need to get project team to find the correct team member
+      const project = await Project.findById(task.projectId._id || task.projectId)
+        .populate('assignedTeam.contentWriters', '_id name')
+        .populate('assignedTeam.graphicDesigners', '_id name')
+        .populate('assignedTeam.videoEditors', '_id name')
+        .populate('assignedTeam.uiUxDesigners', '_id name')
+        .populate('assignedTeam.developers', '_id name')
+        .populate('assignedTeam.contentWriter', '_id name')
+        .populate('assignedTeam.graphicDesigner', '_id name')
+        .populate('assignedTeam.videoEditor', '_id name')
+        .populate('assignedTeam.uiUxDesigner', '_id name')
+        .populate('assignedTeam.developer', '_id name');
+
       if (task.status === 'content_submitted') {
+        // Content rejected - assign back to content writer
         newStatus = 'content_rejected';
         task.assignedRole = 'content_writer';
+
+        // Find the content writer from project team
+        const contentWriter = project?.assignedTeam?.contentWriters?.[0] ||
+                              project?.assignedTeam?.contentWriter;
+        if (contentWriter) {
+          task.assignedTo = contentWriter._id || contentWriter;
+        }
+
       } else if (task.status === 'design_submitted') {
+        // Design rejected - assign back to appropriate designer
         newStatus = 'design_rejected';
-        // Assign back to the appropriate designer based on task type
+
+        let designer = null;
         if (task.taskType === 'landing_page_design') {
           task.assignedRole = 'ui_ux_designer';
+          designer = project?.assignedTeam?.uiUxDesigners?.[0] ||
+                     project?.assignedTeam?.uiUxDesigner;
         } else {
-          task.assignedRole = 'graphic_designer';
+          // For graphic_design or video_editing tasks
+          const videoTypes = ['video_creative', 'ugc_content', 'testimonial_content', 'demo_video', 'reel'];
+          const isVideoTask = task.creativeOutputType && videoTypes.includes(task.creativeOutputType);
+
+          if (isVideoTask || task.taskType === 'video_editing') {
+            task.assignedRole = 'video_editor';
+            designer = project?.assignedTeam?.videoEditors?.[0] ||
+                       project?.assignedTeam?.videoEditor;
+          } else {
+            task.assignedRole = 'graphic_designer';
+            designer = project?.assignedTeam?.graphicDesigners?.[0] ||
+                       project?.assignedTeam?.graphicDesigner;
+          }
         }
+
+        if (designer) {
+          task.assignedTo = designer._id || designer;
+        }
+
       } else if (task.status === 'development_submitted') {
+        // Development rejected - assign back to developer
         newStatus = 'development_pending';
         task.assignedRole = 'developer';
+
+        // Use developerId if stored, otherwise get from project team
+        let developer = task.developerId;
+        if (!developer) {
+          developer = project?.assignedTeam?.developers?.[0] ||
+                      project?.assignedTeam?.developer;
+        }
+        if (developer) {
+          task.assignedTo = developer._id || developer;
+        }
+
       } else {
+        // Legacy rejection
         newStatus = 'rejected';
         task.assignedRole = Task.getRoleForTaskType(task.taskType);
       }
+
       notificationType = 'task_rejected';
       notificationMessage = `Your task "${task.taskTitle}" has been rejected. Please review the feedback and resubmit.`;
     }
@@ -782,14 +825,63 @@ exports.testerReview = async (req, res, next) => {
             };
           }
 
+          // Determine which role should receive the design task based on creativeOutputType
+          const videoTypes = ['video_creative', 'ugc_content', 'testimonial_content', 'demo_video', 'reel'];
+          const isVideoTask = task.creativeOutputType && videoTypes.includes(task.creativeOutputType);
+
+          // Set the assigned role
+          if (isVideoTask) {
+            designTask.assignedRole = 'video_editor';
+          } else {
+            designTask.assignedRole = 'graphic_designer';
+          }
+
+          // Find the assigned designer/video editor
+          // First check if designerId was stored during task creation
+          let assignedMember = null;
+          if (designTask.designerId) {
+            assignedMember = designTask.designerId;
+            console.log('✓ Using stored designerId from task creation:', assignedMember);
+          }
+
+          // If no designerId, get from project team
+          if (!assignedMember) {
+            const project = await Project.findById(task.projectId._id || task.projectId)
+              .populate('assignedTeam.graphicDesigners', '_id name')
+              .populate('assignedTeam.videoEditors', '_id name')
+              .populate('assignedTeam.graphicDesigner', '_id name')
+              .populate('assignedTeam.videoEditor', '_id name');
+
+            if (isVideoTask) {
+              assignedMember = project?.assignedTeam?.videoEditors?.[0] || project?.assignedTeam?.videoEditor;
+            } else {
+              assignedMember = project?.assignedTeam?.graphicDesigners?.[0] || project?.assignedTeam?.graphicDesigner;
+            }
+            console.log('Getting designer from project team:', assignedMember?._id || assignedMember);
+          }
+
+          // Assign the designer to the design task
+          if (assignedMember) {
+            designTask.assignedTo = assignedMember._id || assignedMember;
+            console.log('✓ Assigned designer/editor to design task:', assignedMember.name || assignedMember._id || assignedMember);
+          } else {
+            console.log('⚠ WARNING: No designer/video editor assigned to project');
+          }
+
+          // Update design task status to design_pending if it was waiting for content
+          if (designTask.status === 'todo' || !designTask.status) {
+            designTask.status = 'design_pending';
+          }
+
           await designTask.save();
-          console.log('✓ Successfully saved design task with copied content');
+          console.log('✓ Successfully saved design task with copied content and assignment');
 
           // Verify the save worked
           const verifyTask = await Task.findById(designTask._id);
           console.log('Verification - design task contentLink:', verifyTask.contentLink || '(empty)');
           console.log('Verification - design task contentFile:', verifyTask.contentFile ? '(present)' : '(empty)');
           console.log('Verification - design task contentNotes:', verifyTask.contentNotes ? '(present)' : '(empty)');
+          console.log('Verification - design task assignedTo:', verifyTask.assignedTo?._id || verifyTask.assignedTo || '(none)');
 
           // Notify the assigned designer/editor
           if (designTask.assignedTo) {
@@ -952,21 +1044,67 @@ exports.marketerReview = async (req, res, next) => {
       }
     } else {
       // Rejected - determine rejection status based on task type and status
+      // Need to get project team to find the correct team member
+      const project = await Project.findById(task.projectId._id || task.projectId)
+        .populate('assignedTeam.graphicDesigners', '_id name')
+        .populate('assignedTeam.videoEditors', '_id name')
+        .populate('assignedTeam.uiUxDesigners', '_id name')
+        .populate('assignedTeam.developers', '_id name')
+        .populate('assignedTeam.graphicDesigner', '_id name')
+        .populate('assignedTeam.videoEditor', '_id name')
+        .populate('assignedTeam.uiUxDesigner', '_id name')
+        .populate('assignedTeam.developer', '_id name');
+
       if (task.status === 'design_approved') {
+        // Design rejected by marketer - assign back to appropriate designer
+        newStatus = 'design_rejected';
+
+        let designer = null;
         if (task.taskType === 'landing_page_design') {
-          newStatus = 'design_rejected';
           task.assignedRole = 'ui_ux_designer';
+          designer = project?.assignedTeam?.uiUxDesigners?.[0] ||
+                     project?.assignedTeam?.uiUxDesigner;
         } else {
-          newStatus = 'design_rejected';
-          task.assignedRole = 'graphic_designer';
+          // For graphic_design or video_editing tasks
+          const videoTypes = ['video_creative', 'ugc_content', 'testimonial_content', 'demo_video', 'reel'];
+          const isVideoTask = task.creativeOutputType && videoTypes.includes(task.creativeOutputType);
+
+          if (isVideoTask || task.taskType === 'video_editing') {
+            task.assignedRole = 'video_editor';
+            designer = project?.assignedTeam?.videoEditors?.[0] ||
+                       project?.assignedTeam?.videoEditor;
+          } else {
+            task.assignedRole = 'graphic_designer';
+            designer = project?.assignedTeam?.graphicDesigners?.[0] ||
+                       project?.assignedTeam?.graphicDesigner;
+          }
         }
+
+        if (designer) {
+          task.assignedTo = designer._id || designer;
+        }
+
       } else if (task.status === 'development_approved') {
+        // Development rejected by marketer - assign back to developer
         newStatus = 'development_pending';
         task.assignedRole = 'developer';
+
+        // Use developerId if stored, otherwise get from project team
+        let developer = task.developerId;
+        if (!developer) {
+          developer = project?.assignedTeam?.developers?.[0] ||
+                      project?.assignedTeam?.developer;
+        }
+        if (developer) {
+          task.assignedTo = developer._id || developer;
+        }
+
       } else {
+        // Legacy rejection
         newStatus = 'rejected';
         task.assignedRole = Task.getRoleForTaskType(task.taskType);
       }
+
       notificationType = 'task_rejected';
       notificationMessage = `Your task "${task.taskTitle}" has been rejected by the performance marketer. Please review the feedback and resubmit.`;
     }
@@ -1090,26 +1228,33 @@ exports.marketerReview = async (req, res, next) => {
           developmentTask.designLink = task.designLink;
           developmentTask.designFile = task.designFile;
           developmentTask.designNotes = task.designNotes;
+
+          // Get developer - first check developerId (stored during task creation), then project team
+          let developerId = developmentTask.developerId;
+
+          if (!developerId && project?.assignedTeam?.developers?.length > 0) {
+            developerId = project.assignedTeam.developers[0]._id;
+          } else if (!developerId && project?.assignedTeam?.developer) {
+            developerId = project.assignedTeam.developer._id;
+          }
+
+          // Assign developer to the task now that design is approved
+          if (developerId) {
+            developmentTask.assignedTo = developerId;
+          }
+
           await developmentTask.save();
-        }
 
-        // Get developer from project (try array fields first, then legacy fields)
-        let developerId = developmentTask?.assignedTo;
-
-        if (!developerId && project?.assignedTeam?.developers?.length > 0) {
-          developerId = project.assignedTeam.developers[0]._id;
-        } else if (!developerId && project?.assignedTeam?.developer) {
-          developerId = project.assignedTeam.developer._id;
-        }
-
-        if (developerId) {
-          await Notification.create({
-            recipient: developerId,
-            type: 'task_assigned',
-            title: 'Landing Page Ready for Development',
-            message: `The design for "${task.projectId?.projectName || task.projectId?.businessName || 'a project'}" has been approved and is ready for development.`,
-            projectId: task.projectId._id || task.projectId
-          });
+          // Notify the developer that the task is ready
+          if (developerId) {
+            await Notification.create({
+              recipient: developerId,
+              type: 'task_assigned',
+              title: 'Landing Page Ready for Development',
+              message: `The design for "${task.projectId?.projectName || task.projectId?.businessName || 'a project'}" has been approved and is ready for development.`,
+              projectId: task.projectId._id || task.projectId
+            });
+          }
         }
       }
     }
@@ -1586,7 +1731,9 @@ exports.getTasksByRole = async (req, res, next) => {
       query.testerId = req.user._id;
     } else if (role === 'performance_marketer') {
       // Performance marketers see tasks pending their approval AND assigned to them specifically
-      query.status = { $in: ['content_approved', 'design_approved', 'development_approved'] };
+      // Note: Content goes from Tester → Designer, NOT to Marketer
+      // Marketer only reviews design_approved and development_approved tasks
+      query.status = { $in: ['design_approved', 'development_approved'] };
       // Filter by the specific marketer assigned to this task
       query.marketerId = req.user._id;
     } else {
@@ -1651,7 +1798,9 @@ exports.getMyRoleTasks = async (req, res, next) => {
       query.testerId = req.user._id;
     } else if (assignedRole === 'performance_marketer') {
       // Performance marketers see tasks pending their approval AND assigned to them specifically
-      query.status = { $in: ['content_approved', 'design_approved', 'development_approved'] };
+      // Note: Content goes from Tester → Designer, NOT to Marketer
+      // Marketer only reviews design_approved and development_approved tasks
+      query.status = { $in: ['design_approved', 'development_approved'] };
       query.marketerId = req.user._id;
     } else {
       // For creators, designers, developers - show their assigned tasks

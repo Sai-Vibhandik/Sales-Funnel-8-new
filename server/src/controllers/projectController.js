@@ -1272,3 +1272,51 @@ exports.completeLandingPageStage = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Skip landing page stage (no landing pages required)
+// @route   POST /api/projects/:id/landing-pages/skip
+// @access  Private (Admin, Performance Marketer)
+exports.skipLandingPageStage = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const project = await Project.findById(id);
+
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: 'Project not found'
+      });
+    }
+
+    // Check access
+    const userId = req.user._id.toString();
+    const isAssigned = project.assignedTeam.performanceMarketer?._id?.toString() === userId;
+    if (req.user.role !== 'admin' && project.createdBy.toString() !== userId && !isAssigned) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to complete this stage'
+      });
+    }
+
+    // Mark the landing page stage as complete with skip flag
+    project.stages.landingPage.isCompleted = true;
+    project.stages.landingPage.completedAt = new Date();
+    project.stages.landingPage.skipped = true; // Flag to indicate this stage was skipped
+
+    // Calculate progress
+    project.calculateProgress();
+    await project.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Landing page stage skipped successfully',
+      data: {
+        ...project.toObject(),
+        stageStatus: getStageStatus(project)
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};

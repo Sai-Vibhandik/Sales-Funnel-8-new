@@ -387,46 +387,63 @@ export default function TaskDetailPage() {
     );
   };
 
+  const isAssignedUser = () => {
+    // Check if the current user is assigned to this task
+    // Admins can also submit on behalf of users
+    if (!user || !task) return false;
+    if (user.role === 'admin') return true;
+
+    // Check if user is assigned to the task
+    const assignedToId = task.assignedTo?._id || task.assignedTo;
+    return assignedToId?.toString() === user._id?.toString();
+  };
+
   const canStartTask = () => {
     // Standard tasks can be started from 'todo' status
     // Landing page tasks don't have an 'in_progress' status, so they can't be "started"
-    return task && task.status === 'todo';
+    return task && task.status === 'todo' && isAssignedUser();
   };
 
   const canSubmitTask = () => {
     // Standard tasks can be submitted from 'in_progress' or 'rejected' status
-    return task && ['in_progress', 'rejected'].includes(task.status);
+    // Only assigned users can submit
+    return task && ['in_progress', 'rejected'].includes(task.status) && isAssignedUser();
   };
 
   const canSubmitContent = () => {
     // Content creator can submit from content_pending or content_rejected
+    // Only assigned content writers can submit
     return task && ['content_pending', 'content_rejected'].includes(task.status) &&
-           task.taskType === 'content_creation';
+           task.taskType === 'content_creation' && isAssignedUser();
   };
 
   const canSubmitCreative = () => {
     // Graphic designer / Video Editor can submit from design_pending or design_rejected
+    // Only assigned designers can submit
     return task && ['design_pending', 'design_rejected'].includes(task.status) &&
-           ['graphic_design', 'video_editing'].includes(task.taskType);
+           ['graphic_design', 'video_editing'].includes(task.taskType) && isAssignedUser();
   };
 
   const canResubmitTask = () => {
     // For landing page tasks that have specific pending statuses after rejection
     // They can resubmit directly from design_pending or development_pending
+    // Only show "Resubmit" if the task was previously rejected (has rejection note/reason)
     return task && ['design_pending', 'development_pending'].includes(task.status) &&
-           (task.taskType === 'landing_page_design' || task.taskType === 'landing_page_development');
+           (task.taskType === 'landing_page_design' || task.taskType === 'landing_page_development') &&
+           (task.rejectionNote || task.rejectionReason) &&
+           isAssignedUser();
   };
 
   const canSubmitLandingPage = () => {
     // Landing page design/development tasks can be submitted directly from their pending states
     // Only if they haven't been rejected yet (first submission)
     return task && task.status === 'design_pending' && task.taskType === 'landing_page_design' &&
-           !task.rejectionNote;
+           !task.rejectionNote && isAssignedUser();
   };
 
   const canSubmitLandingPageDev = () => {
     return task && task.status === 'development_pending' && task.taskType === 'landing_page_development' &&
-           !task.rejectionNote;
+           !task.rejectionNote && isAssignedUser();
   };
 
   const canTesterReview = () => {
@@ -1676,8 +1693,9 @@ export default function TaskDetailPage() {
                 </>
               )}
 
-              {/* ============ OTHER CREATIVE TASKS (Graphic Designer, etc.) ============ */}
-              {task.taskType !== 'landing_page_design' && task.taskType !== 'landing_page_development' && (
+              {/* ============ OTHER CREATIVE TASKS (Graphic Designer, Video Editor) ============ */}
+              {/* Note: Content writers have their own form above, this is for graphic_design and video_editing */}
+              {['graphic_design', 'video_editing'].includes(task.taskType) && (
                 <>
                   {/* Creative Link - Required */}
                   <div>

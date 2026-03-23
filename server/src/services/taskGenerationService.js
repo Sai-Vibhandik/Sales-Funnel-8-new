@@ -632,6 +632,7 @@ function generateLandingPageTasks(landingPage, projectId, creativeStrategyId, st
 
   // Landing page development task (will be activated after design is approved by marketer)
   // Flow: development_pending → development_submitted → (Tester reviews) → development_approved → (Marketer approves) → final_approved
+  // IMPORTANT: Developer is NOT assigned here. They will be assigned when design is approved.
   const devTask = createTask({
     projectId,
     landingPageId: landingPage._id,
@@ -640,7 +641,7 @@ function generateLandingPageTasks(landingPage, projectId, creativeStrategyId, st
     assetType: 'landing_page_page',
     taskTitle: `Develop: ${landingPage.name || 'Landing Page'}`,
     assignedRole: 'developer',
-    assignedTo: developer,
+    assignedTo: null, // Developer will be assigned when design is approved
     strategyContext,
     contextLink,
     contextPdfUrl,
@@ -652,6 +653,11 @@ function generateLandingPageTasks(landingPage, projectId, creativeStrategyId, st
   });
   devTask.status = 'development_pending'; // Waiting for design to be approved
   devTask.description = 'This task will become active after the design is approved by the tester and marketer.';
+
+  // Store developer ID for later assignment when design is approved
+  if (developer) {
+    devTask.developerId = developer;
+  }
   tasks.push(devTask);
 
   return tasks;
@@ -849,7 +855,7 @@ function generateCreativePlanTasks(creativePlan, projectId, creativeStrategyId, 
     }
 
     // Content writing task (first in workflow) - assigned to content_writer
-    // Flow: content_pending → content_submitted → (Tester reviews) → content_approved → (Marketer approves) → design_pending
+    // Flow: content_pending → content_submitted → (Tester reviews) → content_final_approved → Designer gets assigned
     if (contentAssignedTo) {
       const contentTask = createTask({
         projectId,
@@ -881,7 +887,8 @@ function generateCreativePlanTasks(creativePlan, projectId, creativeStrategyId, 
 
     // Design/Edit task - assigned based on creative type or specified role
     // For VIDEO: video_editor, For IMAGE/CAROUSEL: graphic_designer
-    // Flow: design_pending → (wait for content_final_approved) → design_submitted → (Tester reviews) → design_approved → (Marketer approves) → final_approved
+    // IMPORTANT: Designer is NOT assigned yet. Will be assigned when content is approved.
+    // Flow: design_pending → (wait for content_final_approved) → designer assigned → design_submitted → (Tester reviews) → design_approved → (Marketer approves) → final_approved
     const designRoleForTask = creativeType === 'VIDEO' ? 'video_editor' : 'graphic_designer';
 
     // Get the content task to link as parent (design depends on content being approved)
@@ -897,7 +904,7 @@ function generateCreativePlanTasks(creativePlan, projectId, creativeStrategyId, 
       creativeOutputType: taskConfig.creativeOutputType,
       taskTitle: taskTitle,
       assignedRole: designRoleForTask,
-      assignedTo: designAssignedTo,
+      assignedTo: null, // Designer will be assigned when content is approved by tester
       strategyContext,
       contextLink,
       contextPdfUrl,
@@ -913,13 +920,17 @@ function generateCreativePlanTasks(creativePlan, projectId, creativeStrategyId, 
       marketerId: marketerId // Marketer for final approval
     });
     designTask.status = 'design_pending';
-    if (contentAssignedTo) {
-      designTask.description = 'This task will become active after content is approved by tester and marketer.';
+    designTask.description = 'This task will become active after content is approved by the tester.';
+
+    // Store the intended designer for later assignment when content is approved
+    if (designAssignedTo) {
+      designTask.designerId = designAssignedTo;
     }
+
     // Note: parentTaskId will be set after tasks are saved, to link design to content
     tasks.push(designTask);
 
-    console.log(`Created design task assigned to: ${designAssignedTo}, tester: ${testerId}, marketer: ${marketerId}`);
+    console.log(`Created design task (designer will be assigned after content approval). Intended designer: ${designAssignedTo}, tester: ${testerId}, marketer: ${marketerId}`);
   }
 
   console.log(`Generated ${tasks.length} tasks from creative plan with ${creativePlan.length} items`);

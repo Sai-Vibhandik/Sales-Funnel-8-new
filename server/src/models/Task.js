@@ -122,6 +122,18 @@ const taskSchema = new mongoose.Schema({
     ref: 'User',
     description: 'The performance marketer assigned for final approval'
   },
+  // Developer to be assigned when design is approved (for landing page development tasks)
+  developerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    description: 'The developer assigned to implement this task (set when design is approved)'
+  },
+  // Designer to be assigned when content is approved (for graphic design/video editing tasks)
+  designerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    description: 'The designer/video editor assigned to this task (set when content is approved)'
+  },
   // Parent task dependency (e.g., design task depends on content task)
   parentTaskId: {
     type: mongoose.Schema.Types.ObjectId,

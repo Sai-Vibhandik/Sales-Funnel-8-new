@@ -15,6 +15,10 @@ const stageSchema = new mongoose.Schema({
   },
   completedAt: {
     type: Date
+  },
+  skipped: {
+    type: Boolean,
+    default: false
   }
 }, { _id: false });
 

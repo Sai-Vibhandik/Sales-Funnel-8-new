@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { Card, CardBody, Button, Spinner } from '@/components/ui';
 import { StageProgressTracker } from '@/components/workflow';
 import LandingPagesList from '@/components/landing-pages/LandingPagesList';
-import { ArrowLeft, CheckCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle, SkipForward } from 'lucide-react';
 import { projectService } from '@/services/api';
 
 export default function LandingPagesListPage() {
@@ -12,6 +12,7 @@ export default function LandingPagesListPage() {
   const projectId = searchParams.get('projectId');
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [skipping, setSkipping] = useState(false);
   const [project, setProject] = useState(null);
 
   useEffect(() => {
@@ -39,6 +40,24 @@ export default function LandingPagesListPage() {
       navigate('/projects');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSkipLandingPage = async () => {
+    if (!confirm('Are you sure you want to skip the Landing Page stage? No landing page tasks will be created for this project.')) {
+      return;
+    }
+
+    try {
+      setSkipping(true);
+      await projectService.skipLandingPageStage(projectId);
+      toast.success('Landing page stage skipped. Proceeding to Creative Strategy.');
+      navigate(`/creative-strategy?projectId=${projectId}`);
+    } catch (error) {
+      console.error('Error skipping landing page stage:', error);
+      toast.error(error?.response?.data?.message || 'Failed to skip landing page stage');
+    } finally {
+      setSkipping(false);
     }
   };
 
@@ -72,7 +91,36 @@ export default function LandingPagesListPage() {
           <CheckCircle className="w-6 h-6 text-green-500" />
           <div>
             <h3 className="font-semibold text-green-800">Stage Completed!</h3>
-            <p className="text-sm text-green-600">You can proceed to Creative Strategy.</p>
+            <p className="text-sm text-green-600">
+              {project?.stages?.landingPage?.skipped
+                ? 'Landing page stage was skipped. Proceed to Creative Strategy.'
+                : 'You can proceed to Creative Strategy.'}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Skip Option Banner */}
+      {!project?.stages?.landingPage?.isCompleted && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <SkipForward className="w-5 h-5 text-amber-600 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="font-semibold text-amber-900">No Landing Page Required?</h3>
+              <p className="text-sm text-amber-700 mt-1">
+                If this project doesn't need a landing page, you can skip this stage and proceed directly to Creative Strategy.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSkipLandingPage}
+                loading={skipping}
+                className="mt-3 border-amber-300 text-amber-700 hover:bg-amber-100"
+              >
+                <SkipForward className="w-4 h-4 mr-2" />
+                Skip Landing Page Stage
+              </Button>
+            </div>
           </div>
         </div>
       )}

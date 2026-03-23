@@ -84,6 +84,7 @@ export const projectService = {
   updateLandingPage: (projectId, landingPageId, data) => api.put(`/projects/${projectId}/landing-pages/${landingPageId}`, data),
   deleteLandingPage: (projectId, landingPageId) => api.delete(`/projects/${projectId}/landing-pages/${landingPageId}`),
   completeLandingPageStage: (projectId) => api.post(`/projects/${projectId}/landing-pages/complete`),
+  skipLandingPageStage: (projectId) => api.post(`/projects/${projectId}/landing-pages/skip`),
 };
 
 // Notification service

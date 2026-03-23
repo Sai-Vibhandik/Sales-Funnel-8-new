@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
-import { projectService } from '@/services/api';
-import { Spinner, Badge } from '@/components/ui';
+import { projectService, taskService } from '@/services/api';
+import { Spinner, Badge, Button, EmptyState } from '@/components/ui';
 import {
   FolderKanban,
   Search,
@@ -15,13 +16,18 @@ import {
   Calendar,
   Briefcase,
   Activity,
-  Timer,
+  Clock,
   Award,
   BarChart3,
   PieChart as PieChartIcon,
   Target,
   Layers,
   ArrowRight,
+  CheckCircle,
+  XCircle,
+  RefreshCw,
+  ClipboardCheck,
+  FileCheck,
 } from 'lucide-react';
 import { cn, formatDate } from '@/lib/utils';
 import {
@@ -35,10 +41,8 @@ import {
   Cell,
   PieChart,
   Pie,
-  LineChart,
-  Line,
 } from 'recharts';
-import { getProjectStatusConfig } from '@/constants/taskStatuses';
+import { getProjectStatusConfig, getStatusConfig, STATUS_CONFIG } from '@/constants/taskStatuses';
 
 // ============================================
 // DESIGN SYSTEM CONSTANTS
@@ -68,7 +72,6 @@ const STAGE_PATHS = {
   creativeStrategy: '/creative-strategy',
 };
 
-// Chart Colors
 const COLORS = {
   primary: '#FFC107',
   secondary: '#FFD54F',
@@ -86,23 +89,93 @@ const COLORS = {
 // ============================================
 
 // Stat Card Component
-function StatCard({ title, value, icon: Icon, iconBg, accent }) {
+function StatCard({ title, value, subtitle, icon: Icon, iconBg, onClick, clickable }) {
   return (
-    <div className="stat-card-enhanced group">
+    <div
+      className={cn(
+        'stat-card-enhanced group',
+        clickable && 'cursor-pointer hover:shadow-lg transition-shadow'
+      )}
+      onClick={onClick}
+    >
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <p className="text-sm text-gray-500 font-medium">{title}</p>
           <p className="text-3xl font-bold text-gray-900 mt-2">{value}</p>
+          {subtitle && <p className="text-xs text-gray-400 mt-1">{subtitle}</p>}
         </div>
         <div className={cn('p-3 rounded-2xl', iconBg)}>
           <Icon size={24} className="text-white" />
         </div>
       </div>
-      {accent && (
-        <div className="mt-3 pt-3 border-t border-gray-100">
-          <p className="text-xs text-gray-500">{accent}</p>
+    </div>
+  );
+}
+
+// Pending Approval Task Card
+function PendingApprovalCard({ task, onApprove, onReject }) {
+  const statusConfig = getStatusConfig(task.status);
+  const taskTypeLabels = {
+    graphic_design: 'Graphic Design',
+    video_editing: 'Video Editing',
+    content_writing: 'Content Writing',
+    landing_page_design: 'Landing Page Design',
+    landing_page_development: 'Landing Page Development',
+  };
+
+  return (
+    <div className="p-4 bg-white rounded-xl border border-gray-100 hover:shadow-md transition-shadow">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex-1">
+          <h4 className="font-medium text-gray-900">{task.taskTitle}</h4>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {task.projectId?.projectName || task.projectId?.businessName}
+          </p>
+        </div>
+        <Badge className={cn(statusConfig.bgColor, statusConfig.textColor)}>
+          {taskTypeLabels[task.taskType] || task.taskType}
+        </Badge>
+      </div>
+
+      <div className="flex items-center gap-4 text-xs text-gray-500 mb-3">
+        <span className="flex items-center gap-1">
+          <CheckCircle size={12} className="text-green-500" />
+          Tester Approved
+        </span>
+        <span className="flex items-center gap-1">
+          <Clock size={12} />
+          {formatDate(task.testerReviewedAt || task.updatedAt)}
+        </span>
+      </div>
+
+      {task.creativeName && (
+        <div className="text-sm text-gray-600 mb-3 p-2 bg-gray-50 rounded-lg">
+          <span className="font-medium">{task.creativeName}</span>
+          {task.creativeOutputType && (
+            <span className="ml-2 text-gray-400">({task.creativeOutputType})</span>
+          )}
         </div>
       )}
+
+      <div className="flex gap-2">
+        <Button
+          size="sm"
+          onClick={() => onApprove(task._id)}
+          className="flex-1"
+        >
+          <CheckCircle size={14} className="mr-1" />
+          Approve
+        </Button>
+        <Button
+          size="sm"
+          variant="danger"
+          onClick={() => onReject(task._id)}
+          className="flex-1"
+        >
+          <XCircle size={14} className="mr-1" />
+          Reject
+        </Button>
+      </div>
     </div>
   );
 }
@@ -156,7 +229,7 @@ function ProjectCard({ project, getNextStage, getStageProgress, navigate }) {
       </div>
 
       {/* Stage Progress Pills */}
-      <div className="flex gap-1 mb-4">
+      {/* <div className="flex gap-1 mb-4">
         {['Onboarding', 'Research', 'Offer', 'Traffic', 'Landing', 'Creative'].map((stage, i) => {
           const isCompleted = i < progress.completed;
           const isCurrent = i === progress.completed;
@@ -171,7 +244,7 @@ function ProjectCard({ project, getNextStage, getStageProgress, navigate }) {
             />
           );
         })}
-      </div>
+      </div> */}
 
       {/* Next Stage Card */}
       {nextStage && (
@@ -248,15 +321,15 @@ export default function PerformanceMarketerDashboard({ user }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [projects, setProjects] = useState([]);
+  const [pendingApprovals, setPendingApprovals] = useState([]);
 
   const [stats, setStats] = useState({
     total: 0,
     active: 0,
+    pendingApproval: 0,
+    strategyComplete: 0,
     completed: 0,
     paused: 0,
-    strategyComplete: 0,
-    completionRate: 0,
-    avgProgress: 0,
   });
 
   // Stage completion data for charts
@@ -268,9 +341,6 @@ export default function PerformanceMarketerDashboard({ user }) {
     creativeStrategy: 0,
   });
 
-  // Projects over time data
-  const [projectsTimeline, setProjectsTimeline] = useState([]);
-
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good morning';
@@ -279,32 +349,31 @@ export default function PerformanceMarketerDashboard({ user }) {
   };
 
   useEffect(() => {
-    fetchAssignedProjects();
+    fetchDashboardData();
   }, []);
 
-  const fetchAssignedProjects = async () => {
+  const fetchDashboardData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const response = await projectService.getProjects({ limit: 50 });
-      const assignedProjects = response.data || [];
-      setProjects(assignedProjects);
+      const [projectsRes, pendingRes] = await Promise.all([
+        projectService.getProjects({ limit: 50 }),
+        taskService.getPendingMarketerApproval(),
+      ]);
 
+      const assignedProjects = projectsRes.data || [];
+      const pendingTasks = pendingRes.data || [];
+
+      setProjects(assignedProjects);
+      setPendingApprovals(pendingTasks);
+
+      // Calculate stats
       const total = assignedProjects.length;
       const active = assignedProjects.filter(p => p.status === 'active').length;
       const completed = assignedProjects.filter(p => p.status === 'completed').length;
       const paused = assignedProjects.filter(p => p.status === 'paused').length;
       const strategyComplete = assignedProjects.filter(p => p.overallProgress === 100 && p.status !== 'completed').length;
-      const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
-
-      // Calculate average progress
-      const totalProgress = assignedProjects.reduce((sum, p) => {
-        const stageKeys = ['onboarding', 'marketResearch', 'offerEngineering', 'trafficStrategy', 'landingPage', 'creativeStrategy'];
-        const completed = stageKeys.filter(key => p.stages?.[key]?.isCompleted).length;
-        return sum + (completed / stageKeys.length) * 100;
-      }, 0);
-      const avgProgress = total > 0 ? Math.round(totalProgress / total) : 0;
 
       // Stage completion stats
       const stageKeys = ['marketResearch', 'offerEngineering', 'trafficStrategy', 'landingPage', 'creativeStrategy'];
@@ -313,52 +382,41 @@ export default function PerformanceMarketerDashboard({ user }) {
         stageCounts[key] = assignedProjects.filter(p => p.stages?.[key]?.isCompleted).length;
       });
 
-      // Projects timeline - group by month
-      const last6Months = [];
-      const now = new Date();
-      for (let i = 5; i >= 0; i--) {
-        const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        last6Months.push({
-          month: date.toLocaleDateString('en-US', { month: 'short' }),
-          year: date.getFullYear(),
-          monthIndex: date.getMonth(),
-          projects: 0,
-          completed: 0,
-        });
-      }
-
-      assignedProjects.forEach(project => {
-        const createdDate = new Date(project.createdAt);
-        const monthIndex = createdDate.getMonth();
-        const year = createdDate.getFullYear();
-
-        last6Months.forEach(item => {
-          if (item.monthIndex === monthIndex && item.year === year) {
-            item.projects++;
-          }
-        });
-
-        // Count completed by completion date (using updatedAt as proxy)
-        if (project.status === 'completed' && project.updatedAt) {
-          const completedDate = new Date(project.updatedAt);
-          last6Months.forEach(item => {
-            if (item.monthIndex === completedDate.getMonth() && item.year === completedDate.getFullYear()) {
-              item.completed++;
-            }
-          });
-        }
+      setStats({
+        total,
+        active,
+        pendingApproval: pendingTasks.length,
+        strategyComplete,
+        completed,
+        paused,
       });
-
-      setStats({ total, active, completed, paused, strategyComplete, completionRate, avgProgress });
       setStageStats(stageCounts);
-      setProjectsTimeline(last6Months);
 
     } catch (err) {
-      console.error('Failed to load projects:', err);
-      setError(err.response?.data?.message || 'Failed to load projects');
-      setProjects([]);
+      console.error('Failed to load dashboard data:', err);
+      setError(err.response?.data?.message || 'Failed to load dashboard');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleApproveTask = async (taskId) => {
+    try {
+      await taskService.marketerReview(taskId, { approved: true });
+      toast.success('Task approved successfully');
+      fetchDashboardData();
+    } catch (err) {
+      toast.error('Failed to approve task');
+    }
+  };
+
+  const handleRejectTask = async (taskId) => {
+    try {
+      await taskService.marketerReview(taskId, { approved: false });
+      toast.success('Task rejected');
+      fetchDashboardData();
+    } catch (err) {
+      toast.error('Failed to reject task');
     }
   };
 
@@ -399,6 +457,13 @@ export default function PerformanceMarketerDashboard({ user }) {
     return { completed, total: 6 };
   };
 
+  // Projects needing strategy work (incomplete stages)
+  const projectsNeedingStrategy = projects.filter(p => {
+    if (p.status !== 'active') return false;
+    const progress = getStageProgress(p);
+    return progress.completed < progress.total;
+  });
+
   // Chart data
   const projectStatusData = [
     { name: 'Active', value: stats.active, color: COLORS.info },
@@ -415,17 +480,28 @@ export default function PerformanceMarketerDashboard({ user }) {
     { name: 'Creative Strategy', value: stageStats.creativeStrategy, color: COLORS.pink },
   ];
 
-  // Line chart data for projects timeline
-  const timelineData = projectsTimeline.map(item => ({
-    name: item.month,
-    projects: item.projects,
-    completed: item.completed,
-  }));
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6 animate-fadeIn">
+        <EmptyState
+          icon={AlertCircle}
+          title="Failed to Load Dashboard"
+          description={error}
+          action={
+            <Button onClick={fetchDashboardData}>
+              <RefreshCw size={16} className="mr-2" />
+              Try Again
+            </Button>
+          }
+        />
       </div>
     );
   }
@@ -453,14 +529,20 @@ export default function PerformanceMarketerDashboard({ user }) {
         <StatCard
           title="Active"
           value={String(stats.active)}
+          subtitle={`${projectsNeedingStrategy.length} need strategy`}
           icon={Activity}
           iconBg="bg-gradient-to-br from-emerald-500 to-emerald-600"
+          clickable
+          onClick={() => navigate('/projects?status=active')}
         />
         <StatCard
-          title="Strategy Complete"
-          value={String(stats.strategyComplete)}
-          icon={Timer}
+          title="Pending Approval"
+          value={String(stats.pendingApproval)}
+          subtitle="Tasks ready for review"
+          icon={ClipboardCheck}
           iconBg="bg-gradient-to-br from-amber-500 to-amber-600"
+          clickable
+          onClick={() => navigate('/tasks/approval')}
         />
         <StatCard
           title="Completed"
@@ -469,6 +551,46 @@ export default function PerformanceMarketerDashboard({ user }) {
           iconBg="bg-gradient-to-br from-purple-500 to-purple-600"
         />
       </div>
+
+      {/* Tasks Pending Approval Section */}
+      {pendingApprovals.length > 0 && (
+        <div className="stat-card-enhanced">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-amber-400 to-amber-500">
+                <FileCheck size={20} className="text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Tasks Awaiting Your Approval</h3>
+                <p className="text-sm text-gray-500">Reviewed by tester, needs your sign-off</p>
+              </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => navigate('/tasks/approval')}>
+              View All
+              <ChevronRight size={16} className="ml-1" />
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {pendingApprovals.slice(0, 6).map(task => (
+              <PendingApprovalCard
+                key={task._id}
+                task={task}
+                onApprove={handleApproveTask}
+                onReject={handleRejectTask}
+              />
+            ))}
+          </div>
+
+          {pendingApprovals.length > 6 && (
+            <div className="mt-4 text-center">
+              <Button variant="outline" onClick={() => navigate('/tasks/approval')}>
+                View All {pendingApprovals.length} Tasks
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -491,12 +613,6 @@ export default function PerformanceMarketerDashboard({ user }) {
               <div className="h-52 flex items-center justify-center">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <defs>
-                      <linearGradient id="completionGradient" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0%" stopColor="#FFC107" />
-                        <stop offset="100%" stopColor="#FFD54F" />
-                      </linearGradient>
-                    </defs>
                     <Pie
                       data={projectStatusData}
                       cx="50%"
@@ -542,7 +658,7 @@ export default function PerformanceMarketerDashboard({ user }) {
                 <Layers size={20} className="text-white" />
               </div>
               <div>
-                <h3 className="font-semibold text-gray-900">Stage Completion</h3>
+                <h3 className="font-semibold text-gray-900">Strategy Completion</h3>
                 <p className="text-sm text-gray-500">Projects per stage</p>
               </div>
             </div>
@@ -575,178 +691,40 @@ export default function PerformanceMarketerDashboard({ user }) {
         </div>
       </div>
 
-      {/* Projects Timeline Line Chart */}
-      <div className="stat-card-enhanced">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-gradient-to-br from-cyan-500 to-cyan-600">
-              <TrendingUp size={20} className="text-white" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900">Projects Timeline</h3>
-              <p className="text-sm text-gray-500">Created & completed over last 6 months</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={timelineData}>
-              <defs>
-                <linearGradient id="projectsGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
-                </linearGradient>
-                <linearGradient id="completedGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis
-                dataKey="name"
-                stroke="#9CA3AF"
-                fontSize={12}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                stroke="#9CA3AF"
-                fontSize={12}
-                axisLine={false}
-                tickLine={false}
-                allowDecimals={false}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              <Line
-                type="monotone"
-                dataKey="projects"
-                name="Created"
-                stroke="#3B82F6"
-                strokeWidth={2}
-                fill="url(#projectsGradient)"
-                dot={{ fill: '#3B82F6', strokeWidth: 2, r: 4 }}
-                activeDot={{ r: 6, fill: '#3B82F6', stroke: '#fff', strokeWidth: 2 }}
-              />
-              <Line
-                type="monotone"
-                dataKey="completed"
-                name="Completed"
-                stroke="#10B981"
-                strokeWidth={2}
-                fill="url(#completedGradient)"
-                dot={{ fill: '#10B981', strokeWidth: 2, r: 4 }}
-                activeDot={{ r: 6, fill: '#10B981', stroke: '#fff', strokeWidth: 2 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="flex items-center justify-center gap-8 pt-4 border-t border-gray-100">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-blue-500" />
-            <span className="text-sm text-gray-600">Projects Created</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-emerald-500" />
-            <span className="text-sm text-gray-600">Projects Completed</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Completion Rate Card */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="stat-card-enhanced md:col-span-1">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600">
-              <Target size={20} className="text-white" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900">Completion Rate</h3>
-              <p className="text-sm text-gray-500">Projects completed</p>
-            </div>
-          </div>
-          <div className="flex items-center justify-center py-4">
-            <div className="relative w-32 h-32">
-              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="none"
-                  stroke="#f3f4f6"
-                  strokeWidth="12"
-                />
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="none"
-                  stroke="url(#progressGradient)"
-                  strokeWidth="12"
-                  strokeLinecap="round"
-                  strokeDasharray={`${stats.completionRate * 2.51} ${251}`}
-                  className="transition-all duration-1000"
-                />
-                <defs>
-                  <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#10B981" />
-                    <stop offset="100%" stopColor="#34D399" />
-                  </linearGradient>
-                </defs>
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center">
-                  <span className="text-3xl font-bold text-gray-900">{stats.completionRate}</span>
-                  <span className="text-lg font-medium text-gray-500">%</span>
-                </div>
+      {/* Projects Needing Strategy Section */}
+      {projectsNeedingStrategy.length > 0 && (
+        <div className="stat-card-enhanced">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary-400 to-primary-500">
+                <Target size={20} className="text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Projects Needing Strategy</h3>
+                <p className="text-sm text-gray-500">Continue working on strategy stages</p>
               </div>
             </div>
+            <Button variant="outline" size="sm" onClick={() => navigate('/projects')}>
+              View All
+              <ChevronRight size={16} className="ml-1" />
+            </Button>
           </div>
-          <div className="text-center text-sm text-gray-500">
-            {stats.completed} of {stats.total} projects completed
+
+          <div className="space-y-4">
+            {projectsNeedingStrategy.slice(0, 3).map((project) => (
+              <ProjectCard
+                key={project._id}
+                project={project}
+                getNextStage={getNextStage}
+                getStageProgress={getStageProgress}
+                navigate={navigate}
+              />
+            ))}
           </div>
         </div>
+      )}
 
-        {/* Average Progress */}
-        <div className="stat-card-enhanced md:col-span-2">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2.5 rounded-xl bg-gradient-to-br from-primary-400 to-primary-500">
-              <BarChart3 size={20} className="text-white" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900">Average Progress</h3>
-              <p className="text-sm text-gray-500">Across all projects</p>
-            </div>
-          </div>
-          <div className="flex items-center justify-center py-6">
-            <div className="text-center">
-              <div className="text-5xl font-bold text-gray-900 mb-2">
-                {stats.avgProgress}<span className="text-2xl text-gray-400">%</span>
-              </div>
-              <p className="text-gray-500">Average strategy completion</p>
-              <div className="mt-4 flex items-center justify-center gap-6">
-                <div className="text-center">
-                  <div className="text-2xl font-semibold text-primary-600">{stats.active}</div>
-                  <div className="text-xs text-gray-500">Active</div>
-                </div>
-                <div className="w-px h-8 bg-gray-200" />
-                <div className="text-center">
-                  <div className="text-2xl font-semibold text-amber-600">{stats.strategyComplete}</div>
-                  <div className="text-xs text-gray-500">Strategy Done</div>
-                </div>
-                <div className="w-px h-8 bg-gray-200" />
-                <div className="text-center">
-                  <div className="text-2xl font-semibold text-emerald-600">{stats.completed}</div>
-                  <div className="text-xs text-gray-500">Completed</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Projects Section */}
+      {/* All Projects Section */}
       <div className="stat-card-enhanced">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -754,7 +732,7 @@ export default function PerformanceMarketerDashboard({ user }) {
               <FolderKanban size={20} className="text-white" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Your Projects</h3>
+              <h3 className="text-lg font-semibold text-gray-900">All Projects</h3>
               <p className="text-sm text-gray-500">Manage and track your work</p>
             </div>
           </div>
@@ -789,27 +767,6 @@ export default function PerformanceMarketerDashboard({ user }) {
           </div>
         )}
       </div>
-
-      {/* Error Toast */}
-      {error && (
-        <div className="fixed bottom-4 right-4 bg-white rounded-xl shadow-xl border border-red-100 p-4 max-w-sm z-50">
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-red-100 rounded-lg">
-              <AlertCircle size={18} className="text-red-600" />
-            </div>
-            <div>
-              <p className="font-medium text-red-900">Error</p>
-              <p className="text-sm text-red-600 mt-0.5">{error}</p>
-              <button
-                onClick={fetchAssignedProjects}
-                className="mt-2 text-sm font-medium text-red-700 hover:text-red-800"
-              >
-                Try again
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

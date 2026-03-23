@@ -95,12 +95,11 @@ const SUBMITTED_STATUSES = [
 ];
 
 // Tasks approved by tester (awaiting marketer approval)
+// Note: content_final_approved goes directly to designer, NOT to marketer
 const APPROVED_STATUSES = [
   'approved_by_tester', // legacy
-  'content_approved', // legacy
-  'design_approved',
-  'development_approved',
-  'content_final_approved'
+  'design_approved',       // Design approved by tester, awaiting marketer
+  'development_approved'   // Development approved by tester, awaiting marketer
 ];
 
 // Tasks fully approved (completed)

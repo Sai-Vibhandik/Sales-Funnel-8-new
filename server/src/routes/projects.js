@@ -18,7 +18,8 @@ const {
   getLandingPage,
   updateLandingPage,
   deleteLandingPage,
-  completeLandingPageStage
+  completeLandingPageStage,
+  skipLandingPageStage
 } = require('../controllers/projectController');
 const {
   getStrategySummary,
@@ -71,6 +72,9 @@ router.route('/:id/landing-pages/:landingPageId')
 
 // Complete landing page stage
 router.post('/:id/landing-pages/complete', authorize('admin', 'performance_marketer'), completeLandingPageStage);
+
+// Skip landing page stage (no landing pages required)
+router.post('/:id/landing-pages/skip', authorize('admin', 'performance_marketer'), skipLandingPageStage);
 
 // Strategy Summary Routes
 router.get('/:projectId/strategy-summary', getStrategySummary);
